@@ -1,0 +1,183 @@
+p.rvb-metabox-title {
+    border-bottom: solid 1px #eaeaea;
+    padding-bottom: 10px;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-top: 50px;
+}
+
+.loading-data {
+  position: absolute;
+  background:rgba(245, 245, 245, 0.71);
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 9;
+}
+.loading-data .load {
+  position: absolute;
+  left: 47%;
+  top: 40%;
+  color: #000;
+}
+
+ul#rvb_hd_properties li {
+    border: solid 1px #eaeaea;
+    padding: 15px;
+    background: #f7f7f7;
+}
+
+ul#rvb_hd_properties li .remove {
+    float: right;
+    color: red;
+    font-size: x-large;
+    line-height: 12px;
+    cursor: pointer;
+}
+
+#send-email-blast .hot-deals {
+    margin: 0;
+    column-count: 3;
+}
+
+.tmp-hide{
+	display: none;
+}
+
+.text-left{
+	text-align: left;
+}
+
+.text-right{
+	text-align: right;
+}
+
+nav.navigation.pagination {
+    text-align: center;
+	    margin-top: 15px;
+}
+
+.financial-report nav.navigation.pagination{
+	float: right;
+}
+
+nav.navigation.pagination a,
+nav.navigation.pagination span.current {
+    padding: 3px 10px;
+    display: inline-block;
+}
+
+nav.navigation.pagination a{
+	background: #0085ba;
+    border-color: #0073aa #006799 #006799;
+    box-shadow: 0 1px 0 #006799;
+    color: #fff;
+    text-decoration: none;
+    text-shadow: 0 -1px 1px #006799, 1px 0 1px #006799, 0 1px 1px #006799, -1px 0 1px #006799;
+	text-decoration: none;
+}
+
+nav.navigation.pagination span.current{
+	    color: #555;
+    border-color: #ccc;
+    background: #f7f7f7;
+    box-shadow: 0 1px 0 #ccc;
+}
+
+.finance-report .paid, .finance-report .undo-owner-paid {
+    font-size: large;
+
+}
+
+.finance-report .paid {
+    color: green;
+	margin-right: 10px;
+}
+
+.finance-report .undo-owner-paid{
+	cursor: pointer;
+}
+
+table.finance-report.total-view {
+    text-align: left;
+    border-collapse: collapse;
+	    border: 1px solid #e5e5e5;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    margin-top: 15px;
+}
+
+table.finance-report.total-view th {
+    padding: 15px;
+    background-color: #f9f9f9;
+}
+
+table.finance-report.total-view td {
+    background-color: #fff;
+    padding: 15px;
+}
+
+.filters-export {
+    margin-bottom: 10px;
+    margin-top: 10px;
+}
+
+/*
+	Graph report CSS
+*/
+.report-container{
+	position: relative;
+	margin-bottom: 30px;
+}
+.graph-container{
+	width: 100%;
+}
+
+.graph-container canvas{
+	background-color: #fff;
+}
+
+.report-head {
+    background-color: #fff;
+    padding: 15px 15px 30px;
+	position: relative;
+}
+
+.report-head h2 {
+   margin: 0;
+}
+
+.report-control {
+    position: absolute;
+	top: 15px;
+	right: 15px;
+}
+
+.report-head select{
+	vertical-align: inherit;
+}
+
+.ms-options-wrap {
+    display: inline-block;
+	position: relative;
+}
+
+.ms-options-wrap > .ms-options{
+	min-width: 200px;
+}
+
+.ms-options-wrap > .ms-options > ul label{
+	padding: 4px 4px 4px 6px;
+}
+
+.ms-options-wrap > .ms-options > ul input[type="checkbox"]{
+	position: static;
+}
+
+.ms-options-wrap.ms-has-selections > button {
+    cursor: pointer;
+}
+
+/*
+	Graph Css End
+*/

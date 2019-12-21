@@ -1,0 +1,44 @@
+.ez-wp-uploader {
+    margin-top: 15px;
+}
+
+div#thumbs {
+    display: table;
+    width: 100%;
+}
+
+.thumb {
+    float: left;
+	position:relative;
+	margin-right: 10px;
+	height: 150px;
+	margin-top: 10px;
+}
+.sortable .thumb {
+	cursor:move;
+}
+.thumb span.remove {
+    position: absolute;
+    background: #fafafa;
+    border-radius: 100%;
+    padding: 0px 7px 2px;
+    right: -5px;
+    top: -5px;
+    cursor: pointer;
+	box-shadow: 1px 1px 2px -1px #333;
+}
+
+.thumb span.remove:hover {
+    background: red;
+    color: #fff;
+}
+
+.ez_upload_button.single-uploader {
+    width: 150px;
+    height: 150px;
+    background-color: #e6e6e6;
+    cursor: pointer;
+}
+.ez_upload_button.single-uploader .thumb {
+    margin: 0;
+}

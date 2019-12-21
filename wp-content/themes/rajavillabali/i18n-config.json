@@ -1,0 +1,15 @@
+{"vendor":{"plugins/qtranslate-x":"3.4"},
+	"admin-config":{
+		"postedit":{
+			"preg_delimiter":"#",
+			"pages":{"post.php":"action=edit", "admin.php":"web-setting"},
+			"forms":{
+				"options":{
+					"fields":{
+						"input":{"jquery":".rvb-ml-field"}
+					}
+				}
+			}
+		}
+	}
+}
