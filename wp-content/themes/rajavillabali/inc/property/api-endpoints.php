@@ -2,7 +2,7 @@
 add_action( 'rest_api_init', function () {
   register_rest_route('rvbali/v1','/allacomodation',array(
       'methods' => 'GET',
-      'callback' => 'getAllAccomodations',
+      'callback' => 'getAcommodations',
   ));
   register_rest_route('rvbali/v1','/hotdeals',array(
 	'methods' => 'GET',
@@ -48,6 +48,23 @@ function getLocationList(){
 		array_push($arrlocation["data"],$term);
 	}
 	return $arrlocation;
+}
+function getAcommodations(){
+	$villas['data'] = array();
+	$args = array(
+        'post_type'		    => array('mphb_room_type'),
+		'posts_per_page'	=> -1
+		
+	);
+	$test = array();
+	$accomodation = new WP_Query($args);
+	while ( $accomodation->have_posts() ) : $accomodation->the_post();
+		$roomType =MPHB()->getRoomTypeRepository()->findById( get_the_ID() );
+		$amenities = $roomType->getFacilities();
+		$h['amenities'] = $amenities;
+		array_push($villas["data"],$h);
+	endwhile;
+	return $villas;
 }
 
 function getAllAccomodations(){
