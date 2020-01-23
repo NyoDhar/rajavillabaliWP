@@ -22,17 +22,24 @@ add_action( 'rest_api_init', function () {
 	));
 });
 
-function getLoginDetails(){
-	$username = sanitize_user($_POST['username']);
-	$password = $_POST['password'];
-	
-	$userdata['data'] = array();
+function getLoginDetails($request){
+	$username = sanitize_user($request['username']);
+	$password = $request['password'];
+	$response['data'] = array();
 	$user = get_user_by( 'login', $username );
+	
 	if ( $user && wp_check_password( $password, $user->data->user_pass, $user->ID) ){
-		array_push($userdata["data"],$user);
-		return $userdata;
+		$data['status'] = "logged in";
+		$data['user'] = $user;
+		array_push($response["data"],$data);
+		return $response;
 	}else{
-	   return false;
+		$data['status'] = "wrong username or password";
+		$data['user'] = $user;
+		$data['username'] = $username;
+		$data['password'] = $password;
+		array_push($response["data"],$data);
+		return $response;
 	}
 	
 }
