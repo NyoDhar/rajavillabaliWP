@@ -29,15 +29,13 @@ function getLoginDetails($request){
 	$user = get_user_by( 'login', $username );
 	
 	if ( $user && wp_check_password( $password, $user->data->user_pass, $user->ID) ){
-		$data['status'] = "logged in";
+		$data['loggedin'] = true;
 		$data['user'] = $user;
 		array_push($response["data"],$data);
 		return $response;
 	}else{
-		$data['status'] = "wrong username or password";
+		$data['loggedin'] = false;
 		$data['user'] = $user;
-		$data['username'] = $username;
-		$data['password'] = $password;
 		array_push($response["data"],$data);
 		return $response;
 	}
