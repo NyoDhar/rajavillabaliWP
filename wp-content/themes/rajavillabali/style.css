@@ -550,6 +550,7 @@ input[type="submit"],
 	padding: 10px 15px;
 	transition: background .2s ease-in-out 0s;
 	cursor: pointer;
+	    display: inline-block;
 }
 
 .button:hover,
@@ -559,6 +560,10 @@ input[type="reset"]:hover,
 input[type="submit"]:hover {
 	background-color: #0b9292;
 	    color: #fafafa;
+}
+
+.button.medium {
+    padding: 15px 30px;
 }
 
 button:active, button:focus,
@@ -586,7 +591,8 @@ input[type="time"],
 input[type="datetime"],
 input[type="datetime-local"],
 input[type="color"],
-textarea {
+textarea,
+select {
 	color: #666;
 	border: 1px solid #ccc;
 	border-radius: 3px;
@@ -784,7 +790,8 @@ form.mphb_sc_search-form {
 
 form.mphb_sc_search-form>p.mphb_sc_search-check-in-date,
 form.mphb_sc_search-form>p.mphb_sc_search-check-out-date {
-    width: 25%;
+    width: 18%;
+    padding-right: 15px;
 }
 
 form.mphb_sc_search-form>p.mphb_sc_search-adults{
@@ -793,7 +800,7 @@ form.mphb_sc_search-form>p.mphb_sc_search-adults{
 
 form.mphb_sc_search-form>p.mphb_sc_search-location,
 form.mphb_sc_search-form>p.mphb_sc_search-submit-button-wrapper{
-	width: 18.5%;
+	width: 25.5%;
 }
 
 p.mphb_sc_search-submit-button-wrapper .button {
@@ -813,6 +820,7 @@ form.mphb_sc_search-form>p select{
     transition: border-color ease-in-out .15s, color ease-in-out .15s;
 	border-radius:0;
 	background-color: transparent;
+	max-width: 100%;
 }
 
 form.mphb_sc_search-form>p input:not([type="submit"]):focus,
@@ -827,7 +835,7 @@ form.mphb_sc_search-form>p input[type="text"]::-webkit-input-placeholder{
 }
 
 form.mphb_sc_search-form>p select {
-    padding: 4px;
+    padding: 3px;
 }
 
 .mphb-room-type ul.short-details {
@@ -949,8 +957,11 @@ p.mphb-view-details-button-wrapper a {
 .ammenities ul.mphb_room_type_facility li .fa {
     color: #333;
 }
+.ammenities ul.mphb_room_type_facility li .fa.fa-times-circle-o {
+    color: red;
+}
 
-.ammenities ul.mphb_room_type_facility li:nth-child(n+3){
+.ammenities ul.mphb_room_type_facility li:nth-child(n+11){
 	display: none;
 }
 
@@ -960,6 +971,10 @@ p.mphb-view-details-button-wrapper a {
 
 .mphb-reservation-cart.mphb-empty-cart {
     display: none;
+}
+
+.sleeping-arrangement .row>div:nth-child(n+4) .the-sla {
+    margin-top: 30px;
 }
 
 .tmp-hide{
@@ -1045,17 +1060,17 @@ span.tagline {
 }
 
 .bookbox {
-    margin-top: -57px;
+    margin-top: -52px;
 	    padding-left: 30px;
 }
 
 .is-sticky .bookbox{
-	margin-top:0;
+	margin-top:15px;
 }
 
 .bookbox p.mphb-regular-price {
     margin-top: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(239, 53, 53, 0.81);
     color: #fff;
     padding: 15px 20px;
     margin-bottom: 0;
@@ -1241,6 +1256,7 @@ header.entry-header.bg:before{
     margin-top: 70px;
 }
 
+.mphb_sc_checkout-wrapper .mphb-children-chooser select,
 .mphb_sc_checkout-wrapper .mphb-adults-chooser select,
 .mphb_sc_checkout-wrapper .mphb-guest-name-wrapper input,
 section#mphb-customer-details input,
@@ -1251,6 +1267,7 @@ section#mphb-customer-details select {
 	border-radius: 3px;
 }
 
+.mphb_sc_checkout-wrapper .mphb-children-chooser label,
 .mphb_sc_checkout-wrapper .mphb-adults-chooser label,
 .mphb_sc_checkout-wrapper .mphb-guest-name-wrapper label {
     display: block;
@@ -1569,6 +1586,9 @@ ul.social-icons a:hover {
 
 .photo-big {
     position: relative;
+	height: 70vh;
+    background-size: cover;
+    background-position: center;
 }
 
 .total-photos {
@@ -1804,6 +1824,7 @@ div#filter-map {
     width: 20%;
     height: 100%;
     background-color: #fff;
+	    overflow-y: auto;
 }
 
 div#filter-map .property-filter {
@@ -1946,8 +1967,10 @@ ul.mphb_sc_checkout-services-list.mphb_checkout-services-list li {
     background: #333333a3;
     z-index: 999;
     display: none;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    overflow-y: auto;
+    padding-top: 25px;
 }
 
 .popup-window .inner-window {
@@ -1983,7 +2006,9 @@ ul.mphb_sc_checkout-services-list.mphb_checkout-services-list li {
 .field input[type="text"],
 .field input[type="number"],
 .field input[type="email"],
-.field input[type="password"] {
+.field input[type="password"],
+.field input[type="url"],
+.field select {
     width: 300px;
     padding: 10px 8px;
 }
@@ -2094,16 +2119,48 @@ ul.bookings-list .booking-content ul.details {
 	display: none;
 }
 
-#submit-listing .buttons {
+#submit-listing .inner-form.editing {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(230, 234, 237, 0.8);
+    z-index: 9999999;
+    overflow-y: auto;
+}
+
+.editing h2.step-title {
+    background: #e6eaed;
+    margin: 0;
+    padding: 15px;
+}
+
+#submit-listing .buttons,
+#submit-listing .buttons-editing {
     margin-top: 25px;
 }
 
-#submit-listing .buttons .prev {
+#submit-listing .buttons-editing {
+    margin-bottom: 50px;
+}
+
+#submit-listing .buttons .prev,
+#submit-listing .buttons .cancel-edit {
     background: #f9f9f9;
     padding: 10px;
     border-radius: 3px;
     cursor: pointer;
 	margin-right: 10px;
+}
+
+#submit-listing .inner-form.editing .buttons{
+	display: none;
+}
+
+#submit-listing .inner-form:not(.editing) .buttons-editing{
+	display: none;
 }
 
 #submit-listing select#area {
@@ -2176,7 +2233,7 @@ input.has-nempel {
     position: absolute;
     background-color: #fff;
 	top: 0;
-	z-index: 99;
+	z-index: 59;
 }
 
 .msgbox-left:before {
@@ -2242,19 +2299,9 @@ ul.cancel-policies li {
     margin-bottom: 5px;
 }
 
-a.edit-info.prev {
-    position: absolute;
-    right: 0;
-    top: 0;
-}
-
 .the-form.review .field {
     border-bottom: solid 1px #ccc;
     padding-bottom: 25px;
-}
-
-div#area-review {
-    margin-bottom: 25px;
 }
 
 .listings .the-listing {
@@ -2310,11 +2357,26 @@ div#area-review {
 
 .uploaded-images {
     display: flex;
+    flex-wrap: wrap;
+    margin-left: -5px;
+    margin-right: -5px;
 }
 
 .uploaded-images .uploaded-img {
-    margin: 5px;
-	width: 33.33333%;
+    flex: 0 33%;
+    padding: 5px;
+	position: relative;
+}
+
+.uploaded-images .uploaded-img .featured {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    color: #fff;
+    background: #29adc6ba;
+    font-size: 1.5em;
+    border-radius: 100%;
+    padding: 8px;
 }
 
 .uploaded-images a.remove-uploaded-photo {
@@ -2435,6 +2497,223 @@ ul.menu.booking-action>li:hover>.sub-menu{
 .bookings-wrapper h2 {
     margin-top: 0;
 }
+
+.reset-password-form {
+    max-width: 450px;
+    margin: auto;
+    margin-top: 80px;
+}
+
+p.mphb_sc_search-children {
+    display: none;
+}
+
+img.user-pp {
+    width: 42px;
+    border-radius: 100%;
+    vertical-align: middle;
+}
+
+form#pp .fa-pencil {
+    position: absolute;
+    right: 4px;
+    display: none;
+}
+form#pp {
+    display: inline;
+    position: relative;
+    margin-right: 10px;
+	cursor: pointer;
+}
+
+form#pp:hover .fa-pencil{
+	display: inline-block;
+}
+
+table.wp-list-table {
+    background: #fff;
+    border-collapse: collapse;
+	border: solid 1px #eaeaea;
+	text-align: center;
+	margin-top: 15px;
+}
+table.wp-list-table tr {
+    border-top: solid 1px #eaeaea;
+	
+}
+
+table.wp-list-table tr:nth-child(odd) td {
+    background:#f9f9f9;
+	
+}
+table.wp-list-table tr th, table.wp-list-table tr td {
+    padding: 5px;
+}
+
+table.finance-report.total-view {
+    text-align: left;
+    border-collapse: collapse;
+	    border: 1px solid #e5e5e5;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+	    width: auto;
+}
+
+table.finance-report.total-view th {
+    padding: 15px;
+    background-color: #f9f9f9;
+}
+
+table.finance-report.total-view td {
+    background-color: #fff;
+    padding: 15px;
+}
+
+.the-room {
+    display: flex;
+    align-items: center;
+    background: #e6eaed;
+    padding: 10px 15px;
+    border-radius: 5px;
+}
+
+.field.the-room ul {
+    list-style: none;
+    margin: 0;
+}
+
+.field.the-room ul li {
+    margin: 5px 0;
+}
+
+input#bedrooms::-webkit-inner-spin-button, 
+input#bedrooms::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+
+ul.inline-ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+}
+
+ul.inline-ul li {
+    margin-right: 15px;
+}
+
+.the-form .field .description {
+    font-size: .8em;
+    margin: 5px 0;
+}
+
+.ical-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ical-list li {
+    background: #eef1f3;
+    padding: 10px 38px 10px 15px;
+    margin: 5px 0;
+	position: relative;
+}
+
+.ical-list li .delete {
+	font-size: 2em;
+    line-height: 20px;
+    cursor: pointer;
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.ical-list li .delete:hover {
+	color: red;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    display: none;
+    min-width: 203px;
+    padding: 5px 0;
+    margin: 2px 0 0;
+    list-style: none;
+    font-size: 16px;
+    text-align: left;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border: 1px solid rgba(0,0,0,.15);
+    border-radius: 0;
+    -webkit-box-shadow: 0 3px 4px rgba(0,0,0,.175);
+    box-shadow: 0 3px 4px rgba(0,0,0,.175);
+    background-clip: padding-box;
+}
+
+.bts_dropdown ul {
+    list-style: none;
+    padding: 0;
+}
+
+.open>.dropdown-menu {
+    display: block;
+}
+
+.collapsing, .dropdown {
+    position: relative;
+}
+
+button.btn.btn-primary.dropdown-toggle {
+    border: 0;
+    border-bottom: solid 1px #b3b3b3;
+    webkit-transition: border-color ease-in-out .15s, color ease-in-out .15s;
+    transition: border-color ease-in-out .15s, color ease-in-out .15s;
+    border-radius: 0;
+    background-color: transparent;
+    color: #666;
+    text-align: left;
+    padding: 7px 0;
+    width: calc(100% - 15px);
+	outline: none;
+}
+
+button.btn.btn-primary.dropdown-toggle:before {
+    font-size: 14px;
+    color: #888f99;
+    content: "\f0d7";
+    font-family: FontAwesome;
+    position: absolute;
+    z-index: 1;
+    top: 8px;
+    right: 11px;
+}
+
+.bts_dropdown ul li label:hover {
+    background-color: #ececec;
+}
+
+.bts_dropdown ul li label {
+    color: #333;
+    font-size: 13px;
+    width: 100%;
+    cursor: pointer;
+    padding-left: 40px;
+	display: block;
+}
+
+.bts_dropdown ul li{
+	padding-left: 0;
+}
+
+.bts_dropdown ul li label input {
+    left: 20px;
+}
+
 /* Custom CSS End blonk-end*/
 
 @media screen and (min-width: 37.5em) {

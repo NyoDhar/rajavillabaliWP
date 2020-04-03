@@ -16,6 +16,7 @@ function get_revenue($args = array()){
 					'date-from'			=> ( !empty($_GET['date-from']) ?  $_GET['date-from'] : ''),
 					'date-until'		=> ( !empty($_GET['date-until']) ?  $_GET['date-until'] : ''),
 					'accomodation_id'	=> ( !empty($_GET['accomodation_id']) ?  $_GET['accomodation_id'] : ''),
+					'owner_id'			=> '',
 				);
 	
 	$args = wp_parse_args( $args, $defaults );
@@ -34,11 +35,26 @@ function get_revenue($args = array()){
 		$where .= ' AND CAST( bdate.meta_value as DATE ) BETWEEN CAST("'.$args['date-from'].'" as DATE ) AND  CAST("'.$args['date-until'].'" as DATE )';
 	}
 	
-	if(!empty( $args['accomodation_id'] )){
+	/* if(!empty( $args['accomodation_id'] )){
 		$join .= ' INNER JOIN '.$wpdb->posts.' reservedroom ON ( reservedroom.post_parent = booking.ID AND reservedroom.post_type="mphb_reserved_room" )
 					INNER JOIN '.$wpdb->postmeta.' room ON ( room.post_id = reservedroom.ID AND room.meta_key="_mphb_room_id" )
 					INNER JOIN '.$wpdb->postmeta.' accomodation ON ( accomodation.post_id = room.meta_value AND accomodation.meta_key="mphb_room_type_id" )';
 		$where .= ' AND accomodation.meta_value = '.$args['accomodation_id'];
+	} */
+	
+	if(!empty( $args['accomodation_id'] ) || !empty( $args['owner_id'] )){
+		$join .= ' INNER JOIN '.$wpdb->posts.' reservedroom ON ( reservedroom.post_parent = booking.ID AND reservedroom.post_type="mphb_reserved_room" )
+					INNER JOIN '.$wpdb->postmeta.' room ON ( room.post_id = reservedroom.ID AND room.meta_key="_mphb_room_id" )
+					INNER JOIN '.$wpdb->postmeta.' accomodation ON ( accomodation.post_id = room.meta_value AND accomodation.meta_key="mphb_room_type_id" )';
+		
+		if(!empty( $args['accomodation_id'] )){
+			$where .= ' AND accomodation.meta_value = '.$args['accomodation_id'];
+		}
+		
+		if(!empty( $args['owner_id'] )){
+			$join .= ' INNER JOIN '.$wpdb->posts.' property ON ( property.ID=accomodation.meta_value AND property.post_type="mphb_room_type" )';
+			$where .= ' AND property.post_author = '.$args['owner_id'];
+		}
 	}
 	
 	$wpdb->show_errors(); 
@@ -56,7 +72,13 @@ function get_revenue($args = array()){
 		$limit = '';
 		
 		if($args['paged_bookings']){
-			$paged = ( $_GET[ 'paged' ] ) ? absint( $_GET[ 'paged' ] ) : 1;
+			
+			if(is_admin()){
+				$paged = ( $_GET[ 'paged' ] ) ? absint( $_GET[ 'paged' ] ) : 1;
+			}else{
+				$paged = ( get_query_var( 'paged' ) ) ? get_query_var( 'paged' ) : 1;
+			}
+			
 			$posts_per_page = get_option('posts_per_page');
 			$offset = ( $paged - 1 ) * $posts_per_page;
 
@@ -112,7 +134,7 @@ function get_revenue($args = array()){
 	return $return;
 }
 
-function render_revenue_table( $revenue_data ){
+function render_revenue_table( $revenue_data, $is_front = false ){
 	?>
 	<table class="wp-list-table widefat fixed striped posts finance-report">
 		<thead>
@@ -121,10 +143,25 @@ function render_revenue_table( $revenue_data ){
 				<th>Guest</th>
 				<th>Stay</th>
 				<th>Accomodation</th>
-				<th>Gross Revenue</th>
-				<th>Nett Revenue</th>
-				<th>Owner Revenue</th>
-				<th>Paid to Owner</th>
+				<?php
+					if(!$is_front){
+					?>
+					<th>Gross Revenue</th>
+					<th>Nett Revenue</th>
+					<th>Owner Revenue</th>
+					<th>Paid to Owner</th>
+					<?php
+				}else{
+					?>
+					<th>Gross Revenue</th>
+					<th>Ota Fee</th>
+					<th>Nett Revenue</th>
+					<th>Paid</th>
+					<?php
+				}
+				?>
+				
+				
 			</tr>
 		</thead>
 		<?php
@@ -157,7 +194,18 @@ function render_revenue_table( $revenue_data ){
 		
 				?>
 				<tr>
-					<td><a href="<?php echo get_edit_post_link( $booking_id ); ?>" target="_blank">#<?php echo $booking_id; ?></a></td>
+					<?php
+						if(!$is_front) {
+							?>
+							<td><a href="<?php echo get_edit_post_link( $booking_id ); ?>" target="_blank">#<?php echo $booking_id; ?></a></td>
+							<?php
+						}else{
+							?>
+							<td>#<?php echo $booking_id; ?></td>
+							<?php
+						}
+					?>
+					
 					<td><?php echo $booking->getCustomer()->getFirstName()." ".$booking->getCustomer()->getLastName(); ?></td>
 					<td><?php echo $check_in .' - '. $check_out; ?></td>
 					<td><?php echo get_the_title( $accomodation_id ); ?></td>
@@ -170,12 +218,19 @@ function render_revenue_table( $revenue_data ){
 							if($is_paid == 'paid'){
 								?>
 								<i class="fa fa-check paid" title="have been paid to owner"></i>
-								<i class="fa fa-undo undo-owner-paid" data-bookingid="<?php echo $booking_id ?>" aria-hidden="true" title="Set back as not paid"></i>
 								<?php
+								
+								if(!$is_front){
+								?>
+									<i class="fa fa-undo undo-owner-paid" data-bookingid="<?php echo $booking_id ?>" aria-hidden="true" title="Set back as not paid"></i>
+								<?php
+								}
 							}else{
+								if(!$is_front){
 								?>
 									<input type="button" value="Set Paid" class="button primary set-owner-paid" data-bookingid="<?php echo $booking_id ?>">
 								<?php
+								}
 							}
 						?>
 					</td>
@@ -197,19 +252,19 @@ function render_revenue_table( $revenue_data ){
 			<td><?php echo mphb_format_price($revenue_data['gross_revenue']); ?></td>
 		</tr>
 		<tr>
-			<th>Nett Revenue</th>
+			<th><?php echo !$is_front ? __('Nett Revenue', 'rajavillabali') : __('OTA Fee', 'rajavillabali'); ?></th>
 			<td><?php echo mphb_format_price($revenue_data['nett_revenue']); ?></td>
 		</tr>
 		<tr>
-			<th>Owner Revenue</th>
+			<th><?php echo !$is_front ? __('Owner Revenue', 'rajavillabali') : __('Nett Revenue', 'rajavillabali'); ?></th>
 			<td><?php echo mphb_format_price($revenue_data['owner_revenue']); ?></td>
 		</tr>
 		<tr>
-			<th>Paid to Owner</th>
+			<th><?php echo !$is_front ? __('Paid to Owner', 'rajavillabali') : __('Paid', 'rajavillabali'); ?></th>
 			<td><?php echo mphb_format_price($revenue_data['paid_to_owner']); ?></td>
 		</tr>
 		<tr>
-			<th>Owner Balance</th>
+			<th><?php echo !$is_front ? __('Owner Balance', 'rajavillabali') : __('Balance', 'rajavillabali'); ?></th>
 			<td><?php echo mphb_format_price($revenue_data['owner_balance']); ?></td>
 		</tr>
 	</table>

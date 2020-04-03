@@ -59,7 +59,7 @@ if(!empty($attributes)){
 				$terms = wp_get_post_terms(get_the_ID(), 'mphb_ra_'.$at->post_name);
 				
 				if(!is_wp_error($terms) && !empty($terms)){
-					$remain = count($terms) - 2;
+					$remain = count($terms) - 10;
 					?>
 						<div class="col-sm-4">
 							<span class="att-title"><?php echo apply_filters('the_title', $at->post_title ); ?></span>

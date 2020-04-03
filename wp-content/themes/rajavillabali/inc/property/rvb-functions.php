@@ -4,6 +4,7 @@ include_once('api-endpoints.php');
 include_once('reports.php');
 include_once('properties-map.php');
 include_once('account-area/shortcodes.php');
+include_once('rvb-cron-action.php');
 
 //add_action('admin_head', 'hide_some_admin');
 function hide_some_admin(){
@@ -524,9 +525,22 @@ function property_filter($atts){
 	ob_start();
 	
 	$attributes = !empty($_COOKIE['mphb_attributes']) ? json_decode( stripcslashes( $_COOKIE['mphb_attributes'] ), true ) : array();
-	$inclusions = get_terms(array(
-			'taxonomy' => 'mphb_ra_inclusion',
-		));
+	
+	$filters = get_posts(array(
+				'post_type'			=> 'mphb_room_attribute',
+				'posts_per_page'	=> -1,
+				'meta_query'		=> array(
+										array(
+											'key'	=> 'mphb_filter',
+											'value'	=> '1'
+										)
+									)
+			));
+	
+	if(empty($filters)) return '';
+	
+	
+	
 	
 	//var_dump($_GET);
 	
@@ -541,6 +555,7 @@ function property_filter($atts){
 	}else{
 		$location = !empty($attributes) ? $attributes['location'] : '';//$_GET['mphb_attributes']['location'];
 	}
+	
 	?>
 	<div class="property-filter">
 		<span class="h2"><i class="fa fa-filter" aria-hidden="true"></i> <?php _e('Filters', 'rajavillabali') ?> <span class="close-filter hidden-lg">&times;</span></span>
@@ -549,28 +564,51 @@ function property_filter($atts){
 			<input type="hidden" name="mphb_check_out_date" value="<?php echo $check_out; ?>">
 			<input type="hidden" name="mphb_adults" value="<?php echo !empty( $_GET['mphb_adults'] ) ? $_GET['mphb_adults'] : 1; ?>">
 			<input type="hidden" name="mphb_children" value="<?php echo !empty( $_GET['mphb_children'] ) ? $_GET['mphb_children'] : 0; ?>">
-			<input type="hidden" name="mphb_attributes[location]" value="<?php echo $location; ?>">
 			
 			<?php
-				if(!empty($inclusions)){
-					$inclusion_selected = !empty($attributes['inclusion']) ? $attributes['inclusion'] : array(); //!empty($_GET['mphb_attributes']['inclusion']) ? $_GET['mphb_attributes']['inclusion'] : array();
+				if(is_array($location)){
+					$i = 0;
+					foreach($location as $loc){
+						?>
+						<input type="hidden" name="mphb_attributes[location][<?php echo $i; ?>]" value="<?php echo $loc; ?>">
+						<?php
+						$i++;
+					}
+				}else{
 					?>
-					<div class="filter-section">
-						<span class="filter-title"><?php _e('Inclusion', 'rajavillabali'); ?></span>
-						<ul class="filter-list">
-							<?php
-							foreach($inclusions as $inc){
-								?>
-								<li>
-									<input id="inclusion-<?php echo $inc->term_id; echo $atts['id'];?>" type="checkbox" name="mphb_attributes[inclusion][]" value="<?php echo $inc->term_id ?>" <?php echo in_array( $inc->term_id, $inclusion_selected ) ? 'checked' : ''; ?> >
-									<label for="inclusion-<?php echo $inc->term_id; echo $atts['id']; ?>"><?php echo $inc->name ?></label>
-								</li>
-								<?php
-							}
-							?>
-						</ul>
-					</div>	
+					<input type="hidden" name="mphb_attributes[location]" value="<?php echo $location; ?>">
 					<?php
+				}
+			?>
+			
+			
+			<?php
+				foreach($filters as $filter){
+					$tax = 'mphb_ra_'.$filter->post_name;
+					$inclusions = get_terms(array(
+							'taxonomy' => $tax,
+						));
+						
+					if(!empty($inclusions)){
+						$inclusion_selected = !empty($attributes[$tax]) ? $attributes[$tax] : array(); //!empty($_GET['mphb_attributes']['inclusion']) ? $_GET['mphb_attributes']['inclusion'] : array();
+						?>
+						<div class="filter-section">
+							<span class="filter-title"><?php echo apply_filters('the_title', $filter->post_title ); ?></span>
+							<ul class="filter-list">
+								<?php
+								foreach($inclusions as $inc){
+									?>
+									<li>
+										<input id="inclusion-<?php echo $inc->term_id; echo $atts['id'];?>" type="checkbox" name="mphb_attributes[<?php echo $tax; ?>][]" value="<?php echo $inc->term_id ?>" <?php echo in_array( $inc->term_id, $inclusion_selected ) ? 'checked' : ''; ?> >
+										<label for="inclusion-<?php echo $inc->term_id; echo $atts['id']; ?>"><?php echo $inc->name ?></label>
+									</li>
+									<?php
+								}
+								?>
+							</ul>
+						</div>	
+						<?php
+					}
 				}
 			?>
 			
@@ -811,7 +849,8 @@ function send_booking_confirmed_to_property_owner($booking){
 	} */
 		
 	$email_template = file_get_contents(get_template_directory().'/email-templates/default.html');
-	$subject = __('New Booking - Raja Villa Bali', 'rajavillabali');
+	//$subject = __('New Booking - Raja Villa Bali', 'rajavillabali');
+	$subject = sprintf( __('New Booking - %s', 'rajavillabali'), get_bloginfo('name') );
 	
 	$email_content = "<p>".sprintf( __('Congratulation, you have new booking from %s', 'rajavillabali'), get_bloginfo('name') )."</p>";
 	ob_start();
@@ -822,19 +861,33 @@ function send_booking_confirmed_to_property_owner($booking){
 	\MPHB\Views\BookingView::renderCheckOutDateWPFormatted( $booking );
 	$check_out = ob_get_clean();
 	
-	
-	$total_price = $booking->getTotalPrice();
-	
-	$fee_percentage = get_option('rvb_company_fee');
-	$fee = $total_price * $fee_percentage / 100;
-	$potential_earn = $total_price - $fee;
-	
 	$email_content .= "<h4>Details of booking</h4>
 						Booking ID: #{$booking->getId()}<br>
 						Check-in: {$check_in}<br>
 						Check-out: {$check_out}<br>";
 	
 	$reservedRooms	 = $booking->getReservedRooms();
+	
+	//Get total additional services price then deduct it from total price
+	$reservedServices = $reservedRooms[0]->getReservedServices();
+	$total_service_price = 0;
+	
+	foreach ( $reservedServices as $reservedService ) {
+		/* $reservedService = apply_filters( '_mphb_translate_reserved_service', $reservedService );
+		$id = $reservedService->getOriginalId();
+		$service_label = get_post_meta($id, 'service_label', true); */
+		
+		$total_service_price += $reservedService->calcPrice($booking->getCheckInDate(), $booking->getCheckOutDate());
+	}
+	
+	
+	$total_price = $booking->getTotalPrice() - $total_service_price;
+	
+	$fee_percentage = get_option('rvb_company_fee');
+	$fee = $total_price * $fee_percentage / 100;
+	$potential_earn = $total_price - $fee;
+	
+	
 	$accomodation_id = $reservedRooms[0]->getRoomTypeId();
 	$roomType	 = MPHB()->getRoomTypeRepository()->findById( $accomodation_id );
 					//$roomType	 = apply_filters( '_mphb_translate_room_type', $roomType, $this->booking->getLanguage() );
@@ -960,6 +1013,11 @@ function check_things(){
 		exit();
 	}
 	
+	if(!empty($_GET['check_in_reminder_email'])){
+		check_in_reminder_email();
+		exit();
+	}
+	
 	if(!empty($_GET['check_performance'])){
 		get_rental_occupancy(2813, '2019-08-01', '2019-08-31');
 		exit();
@@ -1008,6 +1066,55 @@ function check_things(){
 	if(!empty($_GET['check_ratep'])){
 		$id = get_property_rate(3395);
 		var_dump($id);
+		
+		exit();
+	}
+	
+	if(!empty($_GET['get_currency_rate'])){
+		echo get_currency_rate('USD', 'IDR', 320);
+		
+		exit();
+	}
+	
+	if(!empty($_GET['check_service'])){
+		
+		$booking = MPHB()->getBookingRepository()->findById( 3590 );
+		
+		send_booking_confirmed_to_property_owner($booking);
+		
+		$reservedRooms	 = $booking->getReservedRooms();
+		$reservedServices = $reservedRooms[0]->getReservedServices();
+		$total_service_price = 0;
+		
+		foreach ( $reservedServices as $reservedService ) {
+			/* $reservedService = apply_filters( '_mphb_translate_reserved_service', $reservedService );
+			$id = $reservedService->getOriginalId();
+			$service_label = get_post_meta($id, 'service_label', true); */
+			
+			$total_service_price += $reservedService->calcPrice($booking->getCheckInDate(), $booking->getCheckOutDate());
+		}
+		
+		$total_price = $booking->getTotalPrice() - $total_service_price;
+	
+		$fee_percentage = get_option('rvb_company_fee');
+		$fee = $total_price * $fee_percentage / 100;
+		$potential_earn = $total_price - $fee;
+		
+		echo $total_price .'<br>';
+		echo $fee .'<br>';
+		echo $potential_earn .'<br>';
+	
+		echo $total_service_price;
+		exit();
+	}
+	
+	if(!empty($_GET['update_season'])){
+		rvb_update_seasons();
+		exit();
+	}
+	
+	if(!empty($_GET['check_c'])){
+		test_get_c();
 		
 		exit();
 	}
@@ -1236,77 +1343,6 @@ function rvb_add_new_review(){
 	wp_die();
 }
 
-function send_asking_review_email($booking_id){
-	$booking = MPHB()->getBookingRepository()->findById($booking_id);
-	$reservedRooms	 = $booking->getReservedRooms();
-	$accomodation_id = $reservedRooms[0]->getRoomTypeId();
-	$customer = $booking->getCustomer();
-	$villa_name = get_the_title($accomodation_id);
-	
-	$to = $customer->getEmail();
-	$subject = 'Still remember your stay at ' . $villa_name . '? - Raja Villa Bali';
-	$email_title = 'Hi ' . $customer->getFirstName();
-	
-	ob_start();
-	?>
-		<p style="font-size: large; text-align: center;">How was your stay at <?php echo $villa_name; ?> ?</p>
-		<?php
-		$gallery_imgs = get_post_meta($accomodation_id, 'rvb_property_photos', true);
-		
-		?>
-		<p style="text-align:center;">
-			<?php echo wp_get_attachment_image($gallery_imgs[0], 'blog-small-thumb'); ?>
-		</p>
-		<p style="text-align:center;">
-			<a style="display: inline-block; padding: 12px 24px; background: #31adad; font-size: 1.2em;color: #fafafa;
-								text-decoration: none;"
-			href="<?php echo get_page_link(3248); ?>?b=<?php echo $booking_id; ?>">I would like to share my experience</a>
-		</p>
-	<?php
-	
-	$email_content = ob_get_clean();
-	//echo $email_content;
-	
-	$status = rvb_send_email($to, $subject, $email_title, $email_content);
-	
-	return $status;
-}
-
-add_action('rvb_send_email_review_request', 'send_email_review_request');
-function send_email_review_request(){
-	//Get confirmed bookings that its checkout date has passed current date
-	$bookings = get_posts(
-					array(
-						'post_type'		=> 'mphb_booking',
-						'post_status'	=> 'confirmed',
-						'posts_per_page'=> 20,
-						'meta_query'	=> array(
-												array(
-													'key'		=> 'email_review_sent',
-													'compare'	=> 'NOT EXISTS',
-												),
-												array(
-													'key'		=> 'mphb_check_out_date',
-													'value'		=> date('Y-m-d'),
-													'compare'	=> '<',
-													'type'		=> 'DATE',
-												)
-											)
-					)
-				);
-	
-	//var_dump($bookings);
-	if(!empty( $bookings )){
-		foreach( $bookings as $b ){
-			//echo $b->ID .' - '.get_post_meta($b->ID, 'mphb_check_out_date', true) .'<hr>';
-			$status = send_asking_review_email( $b->ID );
-			if($status){
-				update_post_meta($b->ID, 'email_review_sent', 'Sent on '. date('Y-m-d'));
-			}
-		}
-	}
-}
-
 add_shortcode('get_cancellation_policies','get_cancellation_policies');
 function get_cancellation_policies($atts){
 	/* $atts = shortcode_atts( array(
@@ -1345,31 +1381,85 @@ add_filter( 'wp_nav_menu_items', 'add_logout_link', 10, 2);
  */
 function add_logout_link( $items, $args )
 {
+	$is_rvb_user_logged_in = rvb_is_user_logged_in();
+	$is_homeowner_logged_in = rvb_is_user_logged_in('homeowner');
+		
     if($args->theme_location == 'menu-top')
     {
-		$is_rvb_user_logged_in = rvb_is_user_logged_in();
-		$is_homeowner_logged_in = rvb_is_user_logged_in('homeowner');
+		
         if($is_rvb_user_logged_in || $is_homeowner_logged_in)
         {
 			//$my_booking_page = get_option('rvb_my_booking_page');
             $items .= '<li>
-							<a href="'.get_page_link( get_option('rvb_my_account_page') ).'">My Account</a>
+							<a href="'.get_page_link( get_option('rvb_my_account_page') ).'">'.__('My Account', 'rajavillabali').'</a>
 							<ul class="sub-menu">';
 							if($is_rvb_user_logged_in){
-								$items .= '<li><a href="'.get_page_link( get_option('rvb_my_booking_page') ).'">My Bookings</a></li>';
+								$items .= '<li><a href="'.get_page_link( get_option('rvb_my_booking_page') ).'">'.__('My Bookings', 'rajavillabali').'</a></li>';
 							}
 							if($is_homeowner_logged_in){
-								$items .= '<li><a href="'.get_page_link( get_option('rvb_my_listings_page') ).'">Listings</a></li>';
+								$items .= '<li><a href="'.get_page_link( get_option('rvb_my_listings_page') ).'">'.__('Listings', 'rajavillabali').'</a></li>';
 							}
-								$items .= '<li><a href="#" id="logout">Logout</a></li>
+								$items .= '<li><a href="#" id="logout">'.__('Logout', 'rajavillabali').'</a></li>
 							</ul>
 						</li>';
         } else {
-            $items .= '<li><a href="#" id="open-login-register">Log In / Register</a></li>';
+            $items .= '<li><a href="#" id="open-login-register">'.__('Log In / Register', 'rajavillabali').'</a></li>';
         }
     }
+	
+	if($args->theme_location == 'account-menu')
+    {
+		if($is_rvb_user_logged_in){
+			$items .= '<li><a href="'.get_page_link( get_option('rvb_my_booking_page') ).'">'.__('My Bookings', 'rajavillabali').'</a></li>';
+		}
+		
+		if($is_homeowner_logged_in){
+			$items .= '<li><a href="'.get_page_link( get_option('rvb_my_listings_page') ).'">'.__('Listings', 'rajavillabali').'</a></li>
+			<li><a href="'.get_page_link( get_option('rvb_owner_income_page') ).'">'.__('Income', 'rajavillabali').'</a></li>';
+		}
+					
+	}
 
     return $items;
+}
+
+//Remove menu item on user account area if the user are not authorized to access it
+//add_filter('wp_nav_menu_objects', 'rvb_filter_menu', 10, 2);
+function rvb_filter_menu($sorted_menu_objects, $args) {
+
+    // check for the right menu to remove the menu item from
+    // here we check for theme location of 'secondary-menu'
+    // alternatively you can check for menu name ($args->menu == 'menu_name')
+    if ($args->theme_location != 'account-menu')  
+        return $sorted_menu_objects;
+
+    // remove the menu item that has a title of 'Uncategorized'
+    /* foreach ($sorted_menu_objects as $key => $menu_object) {
+
+        // can also check for $menu_object->url for example
+        // see all properties to test against:
+        // print_r($menu_object); die();
+        if ($menu_object->title == 'Uncategorized') {
+            unset($sorted_menu_objects[$key]);
+            break;
+        }
+    } */
+	
+	//var_dump($sorted_menu_objects);
+	
+	$user = rvb_get_current_user();
+	
+	//remove my booking link if user cannot make booking, the array key of $sorted_menu_objects is depend on the menu order in wordpress menu, array key start from 1
+	if(!rvb_user_can($user, 'can_booking')){
+		unset($sorted_menu_objects[2]);
+	}
+	
+	//remove my listing link if user cannot submit listing, the array key of $sorted_menu_objects is depend on the menu order in wordpress menu, array key start from 1
+	if(!rvb_user_can($user, 'can_listing')){
+		unset($sorted_menu_objects[3]);
+	}
+
+    return $sorted_menu_objects;
 }
 
 add_action('wp_footer', 'login_register_form');
@@ -1410,7 +1500,7 @@ function login_register_form(){
 									<input type="submit" class="register" name="register" value="<?php _e('Register', 'rajavillabali') ?>">
 							</div>
 							<div class="other-acts">
-									<a href="#" id="forget-password" class="other-act login">Forget your password?</a>
+									<a href="<?php echo get_page_link( get_option('rvb_reset_password_page') ); ?>" id="forget-password" class="other-act login">Forget your password?</a>
 									<a href="#" id="create-account" class="other-act login"><?php _e("Don't have an account yet? Register now", 'rajavillabali'); ?></a>
 									<a href="#" id="sign-in" class="other-act register"><?php _e("Already have an account? Sign in now", 'rajavillabali'); ?></a>
 							</div>
@@ -1471,6 +1561,7 @@ function login_register_form_homeowner(){
 	}
 }
 
+add_action('wp_ajax_rvb_account_action_register', 'rvb_account_action_register');
 add_action('wp_ajax_nopriv_rvb_account_action_register', 'rvb_account_action_register');
 function rvb_account_action_register(){
 	$errors = [];
@@ -1501,14 +1592,22 @@ function rvb_account_action_register(){
 		$errors[] = __('Invalid Email', 'rajavillabali');
 	}
 	
-	if(!empty($_POST['password']) && !empty($_POST['confirm_password'])){
-		if($_POST['password'] == $_POST['confirm_password']){
-			$password = $_POST['password'];
+	
+	$valid = blk_password_meter($_POST['password']);
+	if($valid === true){
+		if(!empty($_POST['password']) && !empty($_POST['confirm_password'])){
+			
+			if($_POST['password'] == $_POST['confirm_password']){
+				$password = $_POST['password'];
+			}else{
+				$errors[] = __('Password and confirm password does not match', 'rajavillabali');
+			}
+			
 		}else{
-			$errors[] = __('Password and confirm password does not match', 'rajavillabali');
+			$errors[] = __('Please fill in both password and confirm password', 'rajavillabali');
 		}
 	}else{
-		$errors[] = __('Please fill in both password and confirm password', 'rajavillabali');
+		$errors[] = $valid;
 	}
 	
 	
@@ -1519,7 +1618,7 @@ function rvb_account_action_register(){
 	}
 	
 	if(empty($errors)){
-		$redirect_to = '';
+		$redirect_to = get_page_link( get_option('rvb_my_account_page') );
 		
 		$args = array(
 				'user_login'	=> $username,
@@ -1533,7 +1632,7 @@ function rvb_account_action_register(){
 			$args['role'] = 'homeowner';
 			$args['first_name'] = $homwowner_name;
 			
-			$redirect_to = get_page_link( get_option('rvb_my_account_page') );
+			
 		}
 		
 		$new_user_id = wp_insert_user($args);
@@ -1557,6 +1656,21 @@ function rvb_account_action_register(){
 	
 }
 
+function blk_password_meter($pass){
+	$valid = true;
+	
+	if(strlen($pass) < 8 || 1 !== preg_match('/[A-Z]/', $pass) || 1 !== preg_match('/[a-z]/', $pass) || 1 !== preg_match('/[^a-zA-Z]+/', $pass)){
+		$valid = false;
+	}
+	
+	if(!$valid){
+		return __('Your password must be at least 8 characters. <br> It must contain a mixture of upper and lower case letters, and at least one number or symbol.', 'rajavillabali');
+	}
+	
+	return $valid;
+}
+
+add_action('wp_ajax_rvb_account_action_login', 'rvb_account_action_login');
 add_action('wp_ajax_nopriv_rvb_account_action_login', 'rvb_account_action_login');
 function rvb_account_action_login(){
 	$username = sanitize_user($_POST['username']);
@@ -1565,7 +1679,8 @@ function rvb_account_action_login(){
 	$result = rvb_check_user_password($username, $password);
 	
 	if( $result !== false ){
-		echo 'success|<p class="success">Sign in successfully, please wait a moment</p>';
+		$redirect_to = get_page_link( get_option('rvb_my_account_page') );
+		echo 'success|<p class="success">Sign in successfully, please wait a moment</p>|'.$redirect_to;
 	}else{
 		echo 'error|<ul><li>Username & password does not match</li></ul>';
 	}
@@ -1617,6 +1732,7 @@ function rvb_user_can($user, $cap){
 	return false;
 }
 
+add_action('wp_ajax_rvb_account_action_logout', 'rvb_account_action_logout');
 add_action('wp_ajax_nopriv_rvb_account_action_logout', 'rvb_account_action_logout');
 function rvb_account_action_logout(){
 	rvb_logout_user();
@@ -1708,10 +1824,18 @@ function rvb_getAvailableRoomTypes(){
 		//Modif to regards the property filters ( filter on the side )
 		foreach($attributes as $key=>$val){
 			if(is_array($val)){
-				foreach($val as $v){
+				if($key == 'location'){
+					$v = implode(',', array_map('absint', $val));
 					$join .= " 
-					INNER JOIN {$wpdb->term_relationships} as {$key}_{$v} ON ( room_types.ID = {$key}_{$v}.object_id  AND {$key}_{$v}.term_taxonomy_id = {$v})
-					";
+						INNER JOIN {$wpdb->term_relationships} as {$key} ON ( room_types.ID = {$key}.object_id  AND {$key}.term_taxonomy_id IN ({$v}) )
+						";
+				}else{
+					foreach($val as $v){
+						$join .= " 
+						INNER JOIN {$wpdb->term_relationships} as {$key}_{$v} ON ( room_types.ID = {$key}_{$v}.object_id  AND {$key}_{$v}.term_taxonomy_id = {$v} )
+						";
+						
+					}
 				}
 			}else{
 				$join .= " 
@@ -1898,7 +2022,7 @@ function rvb_save_property(){
 	
 	if(!empty($post_data['images'])){
 		$meta_input['rvb_property_photos'] = $post_data['images'];
-		$meta_input['_thumbnail_id'] = $post_data['images'][0]; // set first image as post thumbnail
+		$meta_input['_thumbnail_id'] = $post_data['featured-image'];
 	}
 	
 	if(!empty($meta_input)){
@@ -1961,8 +2085,17 @@ function rvb_save_property(){
 											),
 					);
 		
-			wp_insert_post($room_args);
+			$room_id = wp_insert_post($room_args);
 		}
+		
+		//Save iCal Urls
+		$room   = MPHB()->getRoomRepository()->findById( $room_id );
+		// Save new list of URLs
+		$newUrls = is_array( $_POST['mphb_sync_urls'] ) ? $_POST['mphb_sync_urls'] : array();
+		$newUrls = wp_list_pluck( $newUrls, 'url' );
+
+		$room->setSyncUrls( $newUrls );
+		
 		
 		echo 'success|'.$id;
 		
@@ -2037,10 +2170,21 @@ function submit_property_for_review(){
 			$title_msg = __('Your changes have been saved successfully', 'rajavillabali');
 			$content_msg = __('Your changes have been saved successfully and now are shown publicly on our website.', 'rajavillabali');
 		}else{
-			$title_msg = __('Your Property Submitted Successfully', 'rajavillabali');
-			$content_msg = __('Thank you, your property has submitted and are now under review, you will get notified when your property is published.', 'rajavillabali');
+			$title_msg = __('Your property has been submitted successfully', 'rajavillabali');
+			$content_msg = __('Thank you, your property has been submitted and are now under review, you will be notified when your property is published.', 'rajavillabali');
+			
+			$subject = __( sprintf('%s - Your Property Submitted Successfully', get_bloginfo('name') ), 'rajavillabali' );
+			$email_title = __('Your Property Is Under Review', 'rajavillabali');
+			
+			$email_content = '<p>'.__(sprintf('Thank you, your property " %s " has been submitted and are now under review, you will be notified when your property is published.', get_the_title($post_id)), 'rajavillabali') . '</p>';
+			
+			$user = rvb_get_current_user();
+			
+			rvb_send_email($user->user_email, $subject, $email_title, $email_content);
 		}
+		
 		echo 'success|'.$title_msg.'|'.$content_msg;
+		
 	}else{
 		if( !empty($_POST['post_status']) && $_POST['post_status'] != 'draft' ){
 			$error_msg = __('cannot saving your changes at the moment', 'rajavillabali');
@@ -2139,45 +2283,6 @@ function auto_login_from_booking_email(){
 	}
 }
 
-//Remove menu item on user account area if the user are not authorized to access it
-add_filter('wp_nav_menu_objects', 'rvb_filter_menu', 10, 2);
-function rvb_filter_menu($sorted_menu_objects, $args) {
-
-    // check for the right menu to remove the menu item from
-    // here we check for theme location of 'secondary-menu'
-    // alternatively you can check for menu name ($args->menu == 'menu_name')
-    if ($args->theme_location != 'account-menu')  
-        return $sorted_menu_objects;
-
-    // remove the menu item that has a title of 'Uncategorized'
-    /* foreach ($sorted_menu_objects as $key => $menu_object) {
-
-        // can also check for $menu_object->url for example
-        // see all properties to test against:
-        // print_r($menu_object); die();
-        if ($menu_object->title == 'Uncategorized') {
-            unset($sorted_menu_objects[$key]);
-            break;
-        }
-    } */
-	
-	//var_dump($sorted_menu_objects);
-	
-	$user = rvb_get_current_user();
-	
-	//remove my booking link if user cannot make booking, the array key of $sorted_menu_objects is depend on the menu order in wordpress menu, array key start from 1
-	if(!rvb_user_can($user, 'can_booking')){
-		unset($sorted_menu_objects[2]);
-	}
-	
-	//remove my listing link if user cannot submit listing, the array key of $sorted_menu_objects is depend on the menu order in wordpress menu, array key start from 1
-	if(!rvb_user_can($user, 'can_listing')){
-		unset($sorted_menu_objects[3]);
-	}
-
-    return $sorted_menu_objects;
-}
-
 add_action('wp_ajax_rvb_cancel_the_booking', 'rvb_cancel_the_booking');
 add_action('wp_ajax_nopriv_rvb_cancel_the_booking', 'rvb_cancel_the_booking');
 function rvb_cancel_the_booking(){
@@ -2185,8 +2290,8 @@ function rvb_cancel_the_booking(){
 		$booking = get_post($_POST['booking_id']);
 		
 		if($booking){
-			update_post_meta($booking->ID, 'cancel_reason', $_POST['reason']);
-			update_post_meta($booking->ID, 'cancel_file', $_POST['images']);
+			//update_post_meta($booking->ID, 'cancel_reason', $_POST['reason']);
+			//update_post_meta($booking->ID, 'cancel_file', $_POST['images']);
 			
 			$booking = MPHB()->getBookingRepository()->findById( $booking->ID );
 			$booking->setStatus( \MPHB\PostTypes\BookingCPT\Statuses::STATUS_CANCELLED );
@@ -2423,5 +2528,525 @@ function send_booking_date_changes($booking){
 	
 	//Mail it to admin
 	wp_mail($admin_email, $subject, $email, $headers);
+	
+}
+
+add_action('wp_ajax_rvb_get_reset_password_link', 'rvb_get_reset_password_link');
+add_action('wp_ajax_nopriv_rvb_get_reset_password_link', 'rvb_get_reset_password_link');
+function rvb_get_reset_password_link(){
+	if(!empty($_POST['login-info'])){
+		if (filter_var($_POST['login-info'], FILTER_VALIDATE_EMAIL)) {
+			$user_id = email_exists($_POST['login-info']);
+		} else {
+			$user_id = username_exists($_POST['login-info']);
+		}
+		
+		if($user_id){
+			$user = get_user_by('ID', $user_id);
+			
+			$salt = wp_generate_password(20); // 20 character "random" string
+			$key = sha1($salt . $user->user_email . uniqid(time(), true));
+			
+			update_user_meta( $user->ID, 'reset_password_key', $key );
+			
+			$link = get_page_link( get_option('rvb_reset_password_page') ) . '?login='.$user->user_login.'&key='.$key;
+			
+			$site_name = get_bloginfo('name');
+			
+			$subject = __( sprintf('%s - Reset Password', $site_name ), 'rajavillabali' );
+			$email_title = __('Reset Password', 'rajavillabali');
+			
+			$email_content = '<p>Someone has requested a password reset for the following account:</p>
+
+								Site Name: '.$site_name.'<br>
+
+								Username: '.$user->user_login.'<br>
+
+								<p>
+									If this was a mistake, just ignore this email and nothing will happen.<br>
+									To reset your password, visit the following address:<br><br>
+									'.$link.'
+								</p>
+								';
+			
+			rvb_send_email($user->user_email, $subject, $email_title, $email_content);
+			
+			wp_send_json_success(array(
+				'msg'	=> __('We have sent a reset password link to your email', 'rajavillabali'),
+			));
+			
+		}else{
+			wp_send_json_error(array(
+				'msg'	=> __('ERROR: There is no account with that username or email address.', 'rajavillabali'),
+			));
+		}
+	}else{
+		wp_send_json_error(array(
+				'msg'	=> __('ERROR: There is no account with that username or email address.', 'rajavillabali'),
+			));
+	}
+	
+	wp_die();
+}
+
+add_action('wp_ajax_rvb_do_reset_password_link', 'rvb_do_reset_password_link');
+add_action('wp_ajax_nopriv_rvb_do_reset_password_link', 'rvb_do_reset_password_link');
+function rvb_do_reset_password_link(){
+	
+	if(!empty($_POST['uid']) && is_numeric($_POST['uid'])){
+		$user = get_user_by('ID', $_POST['uid']);
+		wp_set_password($_POST['new-password'], $user->ID);
+		
+		wp_send_json_success(array(
+			'msg'	=> __('Your password changed successfully', 'rajavillabali')
+		));
+	}else{
+		wp_send_json_error(array(
+			'msg'	=> __('Invalid request', 'rajavillabali')
+		));
+	}
+	
+	//$result = rvb_check_user_password($user, $_POST['current-password']);
+	
+	/* if ( $user && wp_check_password( $_POST['current-password'], $user->data->user_pass, $user->ID) ){
+		wp_set_password($_POST['new-password'], $user->ID);
+		echo 'success|'.__('Your password changed successfully', 'rajavillabali');
+	}else{
+		echo 'error|'.__('Your current password does not match','rajavillabali');
+	} */
+	
+	wp_die();
+}
+
+add_action('publish_mphb_room_type', 'send_property_published_email', 10, 2);
+function send_property_published_email($id, $post){
+	$user = get_user_by('ID',$post->post_author);
+	$subject = sprintf( __('Congratulation, your property has been published - %s', 'rajavillabali'), get_bloginfo('name') );
+	$email_title = __('Congratulation, your property has been published', 'rajavillabali');
+	$email_content = '<p>'. sprintf( __('Your property %s has been published and now is showing publicly in our website', 'rajavillabali'), apply_filters('the_title', $post->post_title ) ) .'</p>
+						<a style="display: inline-block; padding: 12px 24px; background: #31adad; font-size: 1.2em;color: #fafafa;
+								text-decoration: none;" href="'.get_permalink($id).'">See my property</a>';
+	
+	rvb_send_email($user->user_email, $subject, $email_title, $email_content);
+}
+
+//add_action('wp', 'verify_mc_payment');
+add_shortcode('verify_mc_payment', 'verify_mc_payment');
+function verify_mc_payment(){
+	
+	if(!empty($_GET['payment_id']) && !empty($_POST['tranID'])){
+		if($_POST['status'] == '00'){
+			
+			//amount is empty when using sandbox mode
+			if ( !empty( $_POST['amount'] ) ) {
+				$booking_id = (int) get_post_meta( $_GET['payment_id'], '_mphb_booking_id', true );
+				if($booking_id){
+					update_post_meta( $booking_id, 'rvb_amount_paid', $_POST['amount'] );
+				}
+			}
+			
+			$payment = MPHB()->getPaymentRepository()->findById( $_GET['payment_id'], true );
+			
+			if ( !MPHB()->paymentManager()->canBeCompleted( $payment ) ) {
+				return false;
+			}
+
+			
+
+			/* if ( $completeLog ) {
+				$this->payment->addLog( $completeLog );
+			} */
+
+			//$this->updatePaymentMeta();
+			
+
+			$payment->setTransactionId( mphb_clean( $_POST['tranID'] ) );
+
+			$completed = MPHB()->paymentManager()->completePayment( $payment, '', true );
+			
+			return __('Thank you for your payment. Your transaction has been completed and a receipt for your payment has been emailed to you.', 'rajavillabali');
+		}else{
+			ob_start();
+			
+			_e('Unfortunately, your transaction cannot be completed at this time. Please try again or contact us.', 'rajavillabali');
+			
+			if(!empty($_POST['error_desc'])){
+				echo '<p>Fail reason: '.$_POST['error_desc'].'</p>';
+			}
+			
+			return ob_get_clean();
+		}
+		
+		/* var_dump($completed);
+		
+		exit(); */
+	}
+}
+
+//currency converter using google finance
+function get_currency_rate($from_Currency, $to_Currency, $amount=1) {
+	$amount = urlencode($amount);
+    $from_Currency = urlencode($from_Currency);
+    $to_Currency = urlencode($to_Currency);
+    //$url = "https://www.google.com/finance/converter?a=$amount&from=$from_Currency&to=$to_Currency";
+	//$url = "https://finance.google.com/finance/converter?a=$amount&from=$from_Currency&to=$to_Currency";
+	//$url = "http://www.countrycurrencyrates.com/en/convert/IDR/USD/200000000";
+	//$url = "https://www.xe.com/currencyconverter/convert/?Amount=$amount&From=$from_Currency&To=$to_Currency";
+	//$url = 'https://www.google.com/search?q=1+usd+%3D+EUR&oq=1+usd+%3D+EUR';
+	//$url = 'https://transferwise.com/gb/currency-converter/'.$from_Currency.'-to-'.$to_Currency.'-rate?amount=1';
+	
+	//$access_key = 'fe6af77be16be81ef7700cd97caadfc4';
+	//$url = 'http://data.fixer.io/api/convert?access_key='.$access_key.'&from='.$from_Currency.'&to='.$to_Currency.'&amount='.$amount;
+	
+	
+	//API from https://exchangeratesapi.io/
+	$url = 'https://api.exchangeratesapi.io/latest?base='.$from_Currency.'&symbols='.$to_Currency;
+	
+	//return $url;
+	
+    $ch = curl_init();
+    $timeout = 0;
+    curl_setopt ($ch, CURLOPT_URL, $url);
+    curl_setopt ($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt ($ch, CURLOPT_USERAGENT,
+                 "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36");
+	curl_setopt($ch, CURLOPT_REFERER, 'https://www.google.com/');
+    curl_setopt ($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $rawdata = curl_exec($ch);
+    
+	
+	if(!$rawdata){
+		return array(
+					'error' => curl_error($ch)
+				);
+	}
+	
+	curl_close($ch);
+	//return $rawdata;
+	 //<span class="text-success" data-rate="EUR">0.63037 EUR</span>
+	 
+	/* $data = explode('<span class="text-success">', $rawdata);
+	return $data; */
+	$data = json_decode($rawdata, true);
+	
+	//return $data;
+	if(empty($data['rates'])){
+		$msg = 'File path: ' . __FILE__;
+		wp_mail('blaukblonk04@gmail.com', 'Currency rate checker does not work', $msg);
+		return array(
+					'error'	=> 'Unexpected data returned.',
+				);
+	}
+	
+    //$data = explode(" EUR</span>", $data[1]);
+    //return str_replace(',','',$data[0]);//round(floatval($data[0]),2);
+	return $data['rates'][$to_Currency];
+}
+
+add_action('wp_ajax_nopriv_render_sleeping_arrangement_form', 'render_sleeping_arrangement_form_ajax');
+add_action('wp_ajax_render_sleeping_arrangement_form', 'render_sleeping_arrangement_form_ajax');
+function render_sleeping_arrangement_form_ajax(){
+	$attr = !empty($_POST['attr']) ? $_POST['attr'] : '';
+	render_sleeping_arrangement_form($_POST['bedrooms'], $_POST['start_from'], $attr);
+	wp_die();
+}
+
+function render_sleeping_arrangement_form($bedrooms = 0, $start_from = 0, $attr = ''){
+	/* $bedrooms = !empty($_POST['bedrooms']) ? $_POST['bedrooms'] : '';
+	$start_from = !empty($_POST['start_from']) ? $_POST['start_from'] : ''; */
+	
+	$mphb_bed_types = get_option('mphb_bed_types');
+	
+	for($i=$start_from; $i<$bedrooms; $i++){
+		?>
+		<div class="field the-room">
+			<label><?php printf(__('Room %d', 'rajavillabali'), ($i+1)); ?></label>
+			<ul>
+				<li>
+					<b>Bed Type</b> :
+					<select name="meta[sleeping_arr][<?php echo $i; ?>][bed_type]" class="rvb-required" <?php echo $attr; ?>>
+						<option value=""></option>
+						<?php
+							
+							if(is_array($mphb_bed_types)){
+								foreach($mphb_bed_types as $bed){
+									?>
+									<option value="<?php echo $bed['type'] ?>"><?php echo $bed['type'] ?></option>
+									<?php
+								}
+							}
+							
+						?>
+					</select>
+				</li>
+				<li>
+					<b><?php _e('is en suite bathroom?', 'rajavillabali'); ?></b>:
+					<input type="checkbox" name="meta[sleeping_arr][<?php echo $i; ?>][ensuite_bathroom]" value="yes">
+				</li>
+			</ul>
+		</div>
+		<?php
+	}
+}
+
+add_action('wp_ajax_rvb_save_owner_bank_info', 'rvb_save_owner_bank_info');
+add_action('wp_ajax_nopriv_rvb_save_owner_bank_info', 'rvb_save_owner_bank_info');
+function rvb_save_owner_bank_info(){
+	$user = rvb_get_current_user();
+	if($_POST['uid'] == $user->ID){
+		if(!empty($_POST['verification'])){
+			if(is_valid_otp('change_bank_info', $_POST['verification'])){
+				update_user_meta($user->ID, 'bankinfo', $_POST['bankinfo']);
+				setcookie(md5('change_bank_info'), '', time() - 3600, '/');
+				wp_send_json_success(array(
+						'saved'	=> true,
+						'msg'	=> __('Bank information updated successfully', 'rajavillabali')
+					));
+			}else{
+				wp_send_json_error(array(
+					'msg'	=> __('Verification code is incorrect', 'rajavillabali')
+				));
+			}
+		}else{
+			//Generate OTP here
+			send_bank_change_otp_code($user->user_email);
+			
+			wp_send_json_success(array(
+						'saved'	=> false,
+					));
+		}
+	}else{
+		wp_send_json_error(array(
+				'msg'	=> __('Invalid request', 'rajavillabali')
+			));
+	}
+	
+	wp_die();
+}
+
+add_action('wp_ajax_resend_bank_change_otp', 'resend_bank_change_otp');
+add_action('wp_ajax_nopriv_resend_bank_change_otp', 'resend_bank_change_otp');
+function resend_bank_change_otp(){
+	$user = rvb_get_current_user();
+	
+	if(send_bank_change_otp_code($user->user_email)){
+		wp_send_json_success(array(
+						'msg'	=> __('Verification code resent successfully, the verification code will expired in 10 minutes', 'rajavillabali')
+					));
+	}else{
+		wp_send_json_error(array(
+				'msg'	=> __('We having difficulty in sending the verification code, try again later', 'rajavillabali')
+			));
+	}
+}
+
+function send_bank_change_otp_code($email){
+	$otp = rand(100000,999999);
+	
+	$subject = __(sprintf('Verification Code - %s', get_bloginfo('name')), 'rajavillabali');
+	$email_title = __('Verification Code', 'rajavillabali');
+	
+	$email_content = '<p>'.__(sprintf('You recently attempt to change your bank account information on %s website, use the following code to continue:', get_bloginfo('name')), 'rajavillabali').'</p>';
+	$email_content .= '<h1 style="text-align="center">'.$otp.'</h1>';
+	
+	$status = rvb_send_email($email, $subject, $email_title, $email_content);
+	
+	if($status){
+		setcookie(md5('change_bank_info'), md5($otp), time() + 60 * 10, '/');
+	}
+	
+	return $status;
+}
+
+function is_valid_otp($name, $otp){
+	$cookie_name = md5($name);
+	$cookie_otp = md5($otp);
+	
+	if(!empty($_COOKIE[$cookie_name]) && $_COOKIE[$cookie_name] == $cookie_otp){
+		return true;
+	}else{
+		return false;
+	}
+}
+
+//Upload id_card when the field is changed
+add_action('wp_ajax_rvb_upload_photo_profile', 'rvb_upload_photo_profile');
+add_action('wp_ajax_nopriv_rvb_upload_photo_profile', 'rvb_upload_photo_profile');
+function rvb_upload_photo_profile(){
+	if ( !empty($_FILES['pp-input']) ){
+		if($_FILES['pp-input']['size'] > 2000000){
+			wp_send_json_error(array(
+				'msg'			=> 'File size is too big, maximum is 2mb',
+			));
+			
+			wp_die();
+		}
+	   
+		$img_id = media_handle_upload('pp-input', $order_id );
+		if($img_id && !is_wp_error($img_id)){
+			$user = rvb_get_current_user();
+			update_user_meta($user->ID, 'rvb_pp', $img_id);
+			wp_send_json_success(array(
+				'img_url'			=> wp_get_attachment_image_url($img_id, 'medium'),
+			));
+		}else{
+			wp_send_json_error(array(
+				'msg'			=> $img_id->get_error_message(),
+			));
+		}
+	}else{
+		wp_send_json_error(array(
+				'msg'			=> 'No File',
+			));
+	}
+	
+	wp_die();
+}
+
+add_action('wp_ajax_get_villa_photos_view', 'get_villa_photos_view');
+add_action('wp_ajax_nopriv_get_villa_photos_view', 'get_villa_photos_view');
+function get_villa_photos_view(){
+	$imgs = get_post_meta($_POST['post_id'], 'rvb_property_photos', true);
+	
+	?>
+	<div class="uploaded-images">
+		<?php
+			if(!empty($imgs)){
+				$thumbnail_id = get_post_thumbnail_id($_POST['post_id']);
+				foreach($imgs as $img){
+					if(!empty($img) && is_numeric($img)){
+						?>
+						<div class="uploaded-img">
+							<?php echo wp_get_attachment_image($img, 'blog-small-thumb'); ?>
+							<?php echo $thumbnail_id == $img ? '<i class="fa fa-star-o featured" title="'.__('Featured image', 'rajavillabali').'" aria-hidden="true"></i>' : ''; ?>
+						</div>
+						<?php
+					}
+				}
+			}
+		?>
+	</div>
+	<?php
+	
+	wp_die();
+}
+
+add_action('wp_ajax_get_villa_legal_docs_view', 'get_villa_legal_docs_view');
+add_action('wp_ajax_nopriv_get_villa_legal_docs_view', 'get_villa_legal_docs_view');
+function get_villa_legal_docs_view(){
+	$imgs = get_post_meta($_POST['post_id'], 'rvb_property_legal_document', true);
+	
+	?>
+	<div class="uploaded-images">
+		<?php
+			if(!empty($imgs)){
+				$thumbnail_id = get_post_thumbnail_id($_POST['post_id']);
+				foreach($imgs as $img){
+					if(!empty($img) && is_numeric($img)){
+						?>
+						<div class="uploaded-img">
+							<?php 
+							$type =  get_post_mime_type($img);
+							if($type == 'application/pdf'){
+								$title = get_the_title($img);
+								?>
+								<div class="row">
+									<div class="col-sm-12">
+										<a href="<?php echo wp_get_attachment_url($img); ?>" target="_blank" title="<?php echo $title; ?>">
+											
+											<i class="fa fa-file-pdf-o fa-5x fa-pull-left" aria-hidden="true"></i>
+											<?php echo wp_trim_words( $title, 7, null ); ?><br>
+										</a>
+									</div>
+								</div>
+								<?php
+							}else{
+								echo wp_get_attachment_image($img, 'blog-small-thumb');
+							}
+							
+							?>
+						</div>
+						<?php
+					}
+				}
+			}
+		?>
+	</div>
+	<?php
+	
+	wp_die();
+}
+
+add_action('rvb_auto_update_season', 'rvb_update_seasons');
+function rvb_update_seasons(){
+	$seasons = get_posts(array(
+					'post_type'		=> 'mphb_season',
+					'meta_query'	=> array(
+										array(
+											'key'		=> 'mphb_end_date',
+											'value'		=> date('Y-m-d'),
+											'compare'	=> '<',
+											'type'		=> 'DATE',
+										)
+									)
+				));
+	
+	$log = '';
+	$action = !empty($_GET['update_season']) ? 'manual' : 'auto';
+	$log = date('Y-m-d H:i:s') .' Season '.$action.' updated : ';
+		
+	if(!empty($seasons)){
+		$updated_seasons = array();
+		
+		foreach($seasons as $s){
+			$start_date = DateTime::createFromFormat('Y-m-d', get_post_meta($s->ID, 'mphb_start_date', true) );
+			$end_date = DateTime::createFromFormat('Y-m-d', get_post_meta($s->ID, 'mphb_end_date', true) );
+			
+			$start_date->modify('+1 year');
+			$end_date->modify('+1 year');
+			
+			update_post_meta($s->ID, 'mphb_start_date', $start_date->format('Y-m-d'));
+			update_post_meta($s->ID, 'mphb_end_date', $end_date->format('Y-m-d'));
+			
+			$updated_seasons[] = $s->post_title;
+		}
+		
+		//$action = !empty($_GET['update_season']) ? 'manual' : 'auto';
+		$log .= implode(', ', $updated_seasons)."\r\n";
+		echo $log;
+	}else{
+		$log .= 'No season updated'."\r\n";
+	}
+	
+	file_put_contents(get_template_directory() . '/logs/season_update.txt', $log, FILE_APPEND);
+}
+
+add_filter( 'cron_schedules', 'cron_add_monthly' );
+function cron_add_monthly( $schedules ) {
+	// Adds once a month to the existing schedules.
+	$schedules['monthly'] = array(
+		'interval' => 2592000,
+		'display' => __( 'Once a Month' )
+	);
+	return $schedules;
+}
+
+function test_get_c(){
+	$posts = get_posts(array(
+					'post_type'			=> 'mphb_room_type',
+					'posts_per_page'	=> 2,
+				));
+	
+	
+	$p = array();
+	if($posts){
+		foreach($posts as $p){
+			$p[] = array(
+						'ID'		=> $p->ID,
+						'content'	=> $p->post_content
+					);
+		}
+	}
 	
 }

@@ -123,19 +123,69 @@ if ( !defined( 'ABSPATH' ) ) {
 			</select>-->
 			<?php
 				$the_attributes = !empty($_COOKIE['mphb_attributes']) ? json_decode( stripslashes( $_COOKIE['mphb_attributes'] ), true ) : array();
-				$location = !empty($the_attributes['location']) ? $the_attributes['location'] : '';
+				$locations_selected = !empty($the_attributes['location']) ? $the_attributes['location'] : array();
 				
-				$args = array(
+				/* $args = array(
 					'taxonomy'		=> 'mphb_ra_'.$attributeName,
 					'hide_empty'	=> false,
 					'hierarchical'	=> true,
-					'name'			=> 'mphb_attributes['.$attributeName.']',
-					'id'				=> 'mphb_' . $attributeName . '-' . $uniqid,
-					'show_option_all'	=> '&nbsp;',
+					//'name'			=> 'mphb_attributes['.$attributeName.']',
+					//'id'				=> 'mphb_' . $attributeName . '-' . $uniqid,
+					//'show_option_all'	=> '&nbsp;',
 					'selected'			=> $location,
+					'echo'				=> 0,
 				);
-				wp_dropdown_categories($args);
+				//wp_dropdown_categories($args);
+				$select = wp_dropdown_categories($args);
+				
+				$replace = "<select name='mphb_attributes[$attributeName]' id='mphb_$attributeName-$uniqid' multiple='multiple' data-text='Location' >";
+				$select  = preg_replace( '#<select([^>]*)>#', $replace, $select ); 
+				echo $select; */
+				
 			?>
+			
+			<select name="mphb_attributes[<?php echo $attributeName; ?>]" id="mphb_<?php echo $attributeName .'-'. $uniqid; ?>" multiple="multiple" >
+
+				<?php $locations = get_terms( array(
+					'taxonomy'		=> 'mphb_ra_'.$attributeName,
+					'hide_empty' 	=> false,
+					'parent'		=> 0,
+				) ); ?>
+
+				<?php if ( is_array( $locations ) ) : ?>
+					<?php foreach ( $locations as $location ) : ?>
+						<option value="<?php echo esc_attr( $location->term_id ); ?>" <?php echo in_array($location->term_id, $locations_selected) ? 'selected' : ''; ?>><?php echo esc_html( $location->name ); ?></option>
+
+						<?php $sublocations = get_terms( array(
+							'taxonomy'		=> 'mphb_ra_'.$attributeName,
+							'hide_empty'    => false,
+							'parent'        => $location->term_id,
+						) ); ?>
+
+						<?php if ( is_array( $sublocations ) ) : ?>
+							<?php foreach ( $sublocations as $sublocation ) : ?>
+								<option value="<?php echo esc_attr( $sublocation->term_id ); ?>" <?php echo in_array($location->term_id, $locations_selected) ? 'selected' : ''; ?>>
+									&raquo;&nbsp; <?php echo esc_html( $sublocation->name ); ?>
+								</option>
+
+								<?php $subsublocations = get_terms( array(
+									'taxonomy'		=> 'mphb_ra_'.$attributeName,
+									'hide_empty' 	=> false,
+									'parent' 		=> $sublocation->term_id,
+								) ); ?>
+
+								<?php if ( is_array( $subsublocations ) ) : ?>
+									<?php foreach ( $subsublocations as $subsublocation ) : ?>
+										<option value="<?php echo esc_attr( $subsublocation->term_id ); ?>" <?php echo in_array($location->term_id, $locations_selected) ? 'selected' : ''; ?>>
+											&nbsp;&nbsp;&nbsp;&raquo;&nbsp; <?php echo esc_html( $subsublocation->name ); ?>
+										</option>
+									<?php endforeach; ?>
+								<?php endif; ?>
+							<?php endforeach; ?>
+						<?php endif; ?>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</select>
 		</p>
 	<?php } ?>
 

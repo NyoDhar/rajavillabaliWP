@@ -55,18 +55,35 @@ function rvb_admin_notice() {
 		update_option('rvb_company_fee',$_POST['rvb_company_fee']);
 		update_option('cancelation_policy_page',$_POST['cancel-policy-page']);
 		
+		
+		
 		//Account area options
 		update_option('rvb_my_account_page',$_POST['rvb_my_account_page']);
 		update_option('rvb_my_booking_page',$_POST['rvb_my_booking_page']);
 		update_option('rvb_my_listings_page',$_POST['rvb_my_listings_page']);
 		update_option('rvb_submit_listings_page',$_POST['rvb_submit_listings_page']);
 		update_option('rvb_homeowner_page',$_POST['rvb_homeowner_page']);
+		update_option('rvb_reset_password_page',$_POST['rvb_reset_password_page']);
+		update_option('rvb_owner_income_page',$_POST['rvb_owner_income_page']);
+		
 		
 		
 		//Property Submission by owner options
 		update_option('strength-point-owner',$_POST['strength-point-owner']);
+		update_option('ammenities_input',$_POST['ammenities_input']);
+		update_option('rvb_ical_help_page',$_POST['rvb_ical_help_page']);
 		
+		//Season Update settings
+		update_option('season_auto_update',$_POST['season_auto_update']);
 		
+		//Register season auto update cron job hook
+		if($_POST['season_auto_update'] == 'yes'){
+			if (! wp_next_scheduled ( 'rvb_auto_update_season' )) {
+				wp_schedule_event(time(), 'monthly', 'rvb_auto_update_season');
+			}
+		}else{
+			wp_clear_scheduled_hook('rvb_auto_update_season');
+		}
 		
 		?>
 			<div class="notice notice-success is-dismissible">
@@ -115,6 +132,7 @@ function rvbto_web_setting_menu(){
 						</select>
 					</td>
 				</tr>
+				
 			</table>
 			
 			<h2>User Account</h2>
@@ -182,6 +200,43 @@ function rvbto_web_setting_menu(){
 						?>
 					</td>
 				</tr>
+				
+				<tr>
+					<th scope="row">Reset Password Page</th>
+					<td>
+						<?php
+							$args = array(
+										'name'		=> 'rvb_reset_password_page',
+										'selected'	=> get_option('rvb_reset_password_page'),
+									);
+							rvb_pages_list_dropdown($args);
+						?>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">Owner Income Report Page</th>
+					<td>
+						<?php
+							$args = array(
+										'name'		=> 'rvb_owner_income_page',
+										'selected'	=> get_option('rvb_owner_income_page'),
+									);
+							rvb_pages_list_dropdown($args);
+						?>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">iCal Help Page</th>
+					<td>
+						<?php
+							$args = array(
+										'name'		=> 'rvb_ical_help_page',
+										'selected'	=> get_option('rvb_ical_help_page'),
+									);
+							rvb_pages_list_dropdown($args);
+						?>
+					</td>
+				</tr>
 			</table>
 			
 			<h2>Property Submission</h2>
@@ -194,6 +249,63 @@ function rvbto_web_setting_menu(){
 					</td>
 				</tr>
 				
+				<tr>
+					<th scope="row">Ammenities Inputs</th>
+					<td>
+						<?php
+						$ammenities_input = get_option('ammenities_input');
+						if(empty($ammenities_input)){
+							$ammenities_input = array();
+						}
+							$atts = get_posts(array(
+												'post_type'			=> 'mphb_room_attribute',
+												'posts_per_page'	=> -1,
+											));
+							
+						?>
+						<ul>
+							<?php 
+								if(!empty($atts)){
+									foreach($atts as $att){
+										?>
+										<li>
+											<input type="checkbox" name="ammenities_input[]" value="<?php echo $att->ID ?>" <?php echo in_array($att->ID, $ammenities_input) ? 'checked' : ''; ?> id="att-<?php echo $att->ID ?>">
+											<label for="att-<?php echo $att->ID ?>"><?php echo apply_filters('the_title', $att->post_title); ?></label>
+										</li>
+										<?php
+									}
+								}
+							?>
+						</ul>
+						<p class="description">Select attributes as ammenities inputs on property submission form</p>
+					</td>
+				</tr>
+				
+			</table>
+			
+			<h2>Season Settings</h2>
+			<table class="form-table">
+				<tr>
+					<th scope="row">Season Auto Update</th>
+					<td>
+						<input name="season_auto_update" type="checkbox" value="yes" <?php echo get_option('season_auto_update') == 'yes' ? 'checked' : ''; ?>>
+						<p class="description">if checked, seasons date ranges will be automatically updated, checked is recomended.</p>
+						<?php
+						if(wp_next_scheduled ( 'rvb_auto_update_season' )){
+							?>
+							<p class="description">Next update schedule: <?php echo date('d F Y H:i:s', wp_next_scheduled ( 'rvb_auto_update_season' )); ?></p>
+							<?php
+						}
+						?>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">Season Manual Update</th>
+					<td>
+						<a href="<?php echo get_home_url() ?>/?update_season=1" target="_blank" class="button button-primary">Update Now</a>
+						<p class="description">This will check and update seasons date that has passed.</p>
+					</td>
+				</tr>
 			</table>
 			
 			<p class="submit"><input type="submit" name="rvb-save-web-settings" id="submit" class="button button-primary" value="Save Changes"></p>
@@ -307,6 +419,7 @@ function rvb_email_blast(){
 				</tr>
 				
 			</table>
+			
 			<p class="submit"><input type="submit" name="send-email-blast" id="submit-email-blast" class="button button-primary" value="Send"></p>
 			<div id="progressbar" class="tmp-hide"><div class="progress-label">Loading...</div></div>
 		</form>

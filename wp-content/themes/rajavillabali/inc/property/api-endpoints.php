@@ -1,89 +1,92 @@
 <?php
-add_action( 'rest_api_init', function () {
-  register_rest_route('rvbali/v1','/allacomodation',array(
-      'methods' => 'GET',
-      'callback' => 'getAcommodations',
-  ));
-  register_rest_route('rvbali/v1','/hotdeals',array(
-	'methods' => 'GET',
-	'callback' => 'getHotDeal',
+add_action('rest_api_init', function () {
+	register_rest_route('rvbali/v1', '/allacomodation', array(
+		'methods' => 'GET',
+		'callback' => 'getAcommodations',
 	));
-	register_rest_route('rvbali/v1','/allhotdealvilla/(?P<id>\d+)',array(
+	register_rest_route('rvbali/v1', '/hotdeals', array(
+		'methods' => 'GET',
+		'callback' => 'getHotDeal',
+	));
+	register_rest_route('rvbali/v1', '/allhotdealvilla/(?P<id>\d+)', array(
 		'methods' => 'GET',
 		'callback' => 'getAllHotDealVilla',
 	));
-	register_rest_route('rvbali/v1','/getLocationlist',array(
+	register_rest_route('rvbali/v1', '/getLocationlist', array(
 		'methods' => 'GET',
 		'callback' => 'getLocationList',
 	));
-	register_rest_route('rvbali/v1','/login',array(
+	register_rest_route('rvbali/v1', '/login', array(
 		'methods' => 'POST',
 		'callback' => 'getLoginDetails',
 	));
 });
 
-function getLoginDetails($request){
+function getLoginDetails($request)
+{
 	$username = sanitize_user($request['username']);
 	$password = $request['password'];
 	$response['data'] = array();
-	$user = get_user_by( 'login', $username );
-	
-	if ( $user && wp_check_password( $password, $user->data->user_pass, $user->ID) ){
+	$user = get_user_by('login', $username);
+
+	if ($user && wp_check_password($password, $user->data->user_pass, $user->ID)) {
 		$data['loggedin'] = true;
 		$data['user'] = $user;
-		array_push($response["data"],$data);
+		array_push($response["data"], $data);
 		return $response;
-	}else{
+	} else {
 		$data['loggedin'] = false;
 		$data['user'] = $user;
-		array_push($response["data"],$data);
+		array_push($response["data"], $data);
 		return $response;
 	}
-	
 }
 
-function getLocationList(){
+function getLocationList()
+{
 	$arrlocation["data"] = array();
 	$args = array(
 		'taxonomy'		=> 'mphb_ra_location',
 		'hide_empty'	=> false
 	);
 	$terms = get_terms($args);
-	foreach( $terms as $term ) {
-		array_push($arrlocation["data"],$term);
+	foreach ($terms as $term) {
+		array_push($arrlocation["data"], $term);
 	}
 	return $arrlocation;
 }
-function getAcommodations(){
+function getAcommodations()
+{
 	$villas['data'] = array();
 	$args = array(
-        'post_type'		    => array('mphb_room_type'),
+		'post_type'		    => array('mphb_room_type'),
 		'posts_per_page'	=> -1
-		
+
 	);
 	$test = array();
 	$accomodation = new WP_Query($args);
-	while ( $accomodation->have_posts() ) : $accomodation->the_post();
-		$roomType =MPHB()->getRoomTypeRepository()->findById( get_the_ID() );
+	while ($accomodation->have_posts()) : $accomodation->the_post();
+		$roomType = MPHB()->getRoomTypeRepository()->findById(get_the_ID());
 		$amenities = $roomType->getFacilities();
 		$h['amenities'] = $amenities;
-		array_push($villas["data"],$h);
+		array_push($villas["data"], $h);
 	endwhile;
 	return $villas;
 }
 
-function getAllAccomodations(){
+function getAllAccomodations()
+{
 	$arrvillas = array();
 	$arrvillas["data"] = array();
-    $args = array(
-        'post_type'		    => array('mphb_room_type'),
+	$args = array(
+		'post_type'		    => array('mphb_room_type'),
 		'posts_per_page'	=> -1
-		
+
 	);
 
 	$accomodation = new WP_Query($args);
-	while ( $accomodation->have_posts() ) : $accomodation->the_post();
-		$roomType =MPHB()->getRoomTypeRepository()->findById( get_the_ID() );
+	while ($accomodation->have_posts()) : $accomodation->the_post();
+		$roomType = MPHB()->getRoomTypeRepository()->findById(get_the_ID());
 		$hot_deals_price = $roomType->getDefaultPrice();
 		$based_price = $roomType->getDefaultPrice(false);
 		$amenities = $roomType->getFacilities();
@@ -91,7 +94,7 @@ function getAllAccomodations(){
 		$h["id"] = get_the_ID();
 		$h["title"] = get_the_title();
 		$h["description"] = get_the_content();
-		$h['featured_image'] = wp_get_attachment_url( get_post_thumbnail_id(get_the_ID()) );
+		$h['featured_image'] = wp_get_attachment_url(get_post_thumbnail_id(get_the_ID()));
 		$h['property_email'] = get_post_meta(get_the_ID(), 'rvb_property_contact_email', TRUE);
 		$h['property_phone'] = get_post_meta(get_the_ID(), 'rvb_property_contact_phone', TRUE);
 		$h['bedrooms'] = get_post_meta(get_the_ID(), 'rvb_bedrooms', TRUE);
@@ -99,7 +102,7 @@ function getAllAccomodations(){
 		$h['adult_capacity'] = get_post_meta(get_the_ID(), 'mphb_adults_capacity', TRUE);
 		$h['children_capacity'] = get_post_meta(get_the_ID(), 'mphb_children_capacity', TRUE);
 		$h['land_size'] = get_post_meta(get_the_ID(), 'mphb_size', TRUE);
-		
+
 		/* find room(post_type:mphb_room) by room type id (MPHB_ROOM_TYPE) connected with post_meta : key = mphb_room_type_id, value =  MPHB_ROOM_TYPE*/
 		$roomArgs = array(
 			'post_type'		=>	'mphb_room',
@@ -113,9 +116,9 @@ function getAllAccomodations(){
 		);
 		$room = get_posts($roomArgs);
 		$roomlist = array();
-		foreach ($room as $r){
+		foreach ($room as $r) {
 			$a = $r->ID;
-			array_push($roomlist,$a);
+			array_push($roomlist, $a);
 			/* Find room availability */
 			$availabilityArgs = array(
 				'post_type'		=>	'mphb_reserved_room',
@@ -129,12 +132,12 @@ function getAllAccomodations(){
 			);
 			$availability = get_posts($availabilityArgs);
 			$availabilityList = array();
-			foreach($availability as $available){
+			foreach ($availability as $available) {
 				$reservedID = $available->ID;
 				$bookingID = $available->post_parent;
 				$avail['checkin_date'] = get_post_meta($bookingID, 'mphb_check_in_date', TRUE);
 				$avail['checkout_date'] = get_post_meta($bookingID, 'mphb_check_out_date', TRUE);
-				array_push($availabilityList,$avail);
+				array_push($availabilityList, $avail);
 			}
 		}
 		$h['rooms'] = $roomlist;
@@ -143,38 +146,38 @@ function getAllAccomodations(){
 		$h["hot_deals_price"] = $hot_deals_price;
 		$h["amenities"] = $amenities;
 		$h["gallery"] = $gallery;
-		array_push($arrvillas["data"],$h);
-		
+		array_push($arrvillas["data"], $h);
+
 	endwhile;
 	return $arrvillas;
-
 }
 
-function getHotDeal(){
+function getHotDeal()
+{
 	$arrhotdeals = array();
 	$arrhotdeals["data"] = array();
-    $args = array(
-        'post_type'		    => array('hot-deal'),
+	$args = array(
+		'post_type'		    => array('hot-deal'),
 		'posts_per_page'	=> -1
 	);
 
 	$hotdeal = new WP_Query($args);
-	while ( $hotdeal->have_posts() ) : $hotdeal->the_post();
+	while ($hotdeal->have_posts()) : $hotdeal->the_post();
 		$h["id"] = get_the_ID();
 		$h['title'] = get_the_title();
-		$h['featured_image'] = wp_get_attachment_url( get_post_thumbnail_id(get_the_ID()) );
-		array_push($arrhotdeals["data"],$h);
-		
+		$h['featured_image'] = wp_get_attachment_url(get_post_thumbnail_id(get_the_ID()));
+		array_push($arrhotdeals["data"], $h);
+
 	endwhile;
 	return $arrhotdeals;
-
 }
 
-function getAllHotDealVilla($hotdealId){
+function getAllHotDealVilla($hotdealId)
+{
 	$arrvillas = array();
 	$arrvillas["data"] = array();
-    $args = array(
-        'post_type'		    => array('mphb_room_type'),
+	$args = array(
+		'post_type'		    => array('mphb_room_type'),
 		'posts_per_page'	=> -1,
 		'meta_query'	=>	array(
 			array(
@@ -186,8 +189,8 @@ function getAllHotDealVilla($hotdealId){
 	);
 
 	$accomodation = new WP_Query($args);
-	while ( $accomodation->have_posts() ) : $accomodation->the_post();
-		$roomType =MPHB()->getRoomTypeRepository()->findById( get_the_ID() );
+	while ($accomodation->have_posts()) : $accomodation->the_post();
+		$roomType = MPHB()->getRoomTypeRepository()->findById(get_the_ID());
 		$hot_deals_price = $roomType->getDefaultPrice();
 		$based_price = $roomType->getDefaultPrice(false);
 		$amenities = $roomType->getFacilities();
@@ -195,7 +198,7 @@ function getAllHotDealVilla($hotdealId){
 		$h["id"] = get_the_ID();
 		$h["title"] = get_the_title();
 		$h["description"] = get_the_content();
-		$h['featured_image'] = wp_get_attachment_url( get_post_thumbnail_id(get_the_ID()) );
+		$h['featured_image'] = wp_get_attachment_url(get_post_thumbnail_id(get_the_ID()));
 		$h['property_email'] = get_post_meta(get_the_ID(), 'rvb_property_contact_email', TRUE);
 		$h['property_phone'] = get_post_meta(get_the_ID(), 'rvb_property_contact_phone', TRUE);
 		$h['bedrooms'] = get_post_meta(get_the_ID(), 'rvb_bedrooms', TRUE);
@@ -203,7 +206,7 @@ function getAllHotDealVilla($hotdealId){
 		$h['adult_capacity'] = get_post_meta(get_the_ID(), 'mphb_adults_capacity', TRUE);
 		$h['children_capacity'] = get_post_meta(get_the_ID(), 'mphb_children_capacity', TRUE);
 		$h['land_size'] = get_post_meta(get_the_ID(), 'mphb_size', TRUE);
-		
+
 		/* find room(post_type:mphb_room) by room type id (MPHB_ROOM_TYPE) connected with post_meta : key = mphb_room_type_id, value =  MPHB_ROOM_TYPE*/
 		$roomArgs = array(
 			'post_type'		=>	'mphb_room',
@@ -217,9 +220,9 @@ function getAllHotDealVilla($hotdealId){
 		);
 		$room = get_posts($roomArgs);
 		$roomlist = array();
-		foreach ($room as $r){
+		foreach ($room as $r) {
 			$a = $r->ID;
-			array_push($roomlist,$a);
+			array_push($roomlist, $a);
 			/* Find room availability */
 			$availabilityArgs = array(
 				'post_type'		=>	'mphb_reserved_room',
@@ -233,12 +236,12 @@ function getAllHotDealVilla($hotdealId){
 			);
 			$availability = get_posts($availabilityArgs);
 			$availabilityList = array();
-			foreach($availability as $available){
+			foreach ($availability as $available) {
 				$reservedID = $available->ID;
 				$bookingID = $available->post_parent;
 				$avail['checkin_date'] = get_post_meta($bookingID, 'mphb_check_in_date', TRUE);
 				$avail['checkout_date'] = get_post_meta($bookingID, 'mphb_check_out_date', TRUE);
-				array_push($availabilityList,$avail);
+				array_push($availabilityList, $avail);
 			}
 		}
 		$h['rooms'] = $roomlist;
@@ -247,9 +250,8 @@ function getAllHotDealVilla($hotdealId){
 		$h["hot_deals_price"] = $hot_deals_price;
 		$h["amenities"] = $amenities;
 		$h["gallery"] = $gallery;
-		array_push($arrvillas["data"],$h);
-		
+		array_push($arrvillas["data"], $h);
+
 	endwhile;
 	return $arrvillas;
-
 }

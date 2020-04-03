@@ -1,5 +1,5 @@
 <?php
-	$current_step = 9;
+	$current_step = $GLOBALS['submission_step']['submited'];
 	$next = $current_step + 1;
 	$prev = $current_step - 1;
 ?>

@@ -157,7 +157,8 @@ function rajavillabali_scripts() {
 		wp_enqueue_script('jquery-ui-datepicker');
 	}
 	
-	if(is_page('booking-confirmation') || is_page('my-bookings')){
+	//if(is_page('booking-confirmation') || is_page('my-bookings')){
+	if(is_page_template('templates/page-account.php')){
 		wp_enqueue_style( 'jquery-ui', 'https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css', null, '1.0');
 	}
 	
@@ -165,16 +166,23 @@ function rajavillabali_scripts() {
 	
 	wp_enqueue_script( 'sticky-js', get_template_directory_uri() . '/js/jquery.sticky.js', array('jquery'), null, true );
 	
-	if(is_page( get_option('rvb_submit_listings_page')) || ( is_page( get_option('rvb_my_bookings_page')) && !empty($_GET['action']) && $_GET['action'] == 'cancel-booking') ){
+	$property_submit_page = get_option('rvb_submit_listings_page');
+	
+	if(is_page( $property_submit_page ) || ( is_page( get_option('rvb_my_bookings_page')) && !empty($_GET['action']) && $_GET['action'] == 'cancel-booking') ){
 		wp_enqueue_style( 'dropzone-style', get_template_directory_uri().'/assets/dropzone/style.css' );
-		wp_enqueue_script('dropzone',get_stylesheet_directory_uri(). '/assets/dropzone/dropzone.js', array('jquery'));
-		wp_enqueue_script('drag-drop-uploader', get_stylesheet_directory_uri().'/js/blk-drag-drop-uploader.js',array('jquery','dropzone'));
+		wp_enqueue_script('dropzone',get_stylesheet_directory_uri(). '/assets/dropzone/dropzone.js', array('jquery'), '1.0', true);
+		wp_enqueue_script('drag-drop-uploader', get_stylesheet_directory_uri().'/js/blk-drag-drop-uploader.js',array('jquery','dropzone'), '1.0', true);
+		
+		wp_enqueue_style( 'timepicker-style', 'https://cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.css' );
+		wp_enqueue_script('timepicker-js', 'https://cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.js', array('jquery'));
+		
 		$drop_param = array(
 		  'upload'		=>admin_url( 'admin-ajax.php?action=handle_dropped_media' ),
 		  'delete'		=>admin_url( 'admin-ajax.php?action=handle_deleted_media' ),
-		  'remove_text'	=> __('Remove Photo', 'rajavillabali'),
+		  'remove_text'	=> __('Remove', 'rajavillabali'),
 		  'file_too_big'=> __('File size is larger than 2MB', 'rajavillabali'),
 		  'obj'			=> false,
+		  'fileObj'		=> false,
 		);
 		wp_localize_script('drag-drop-uploader','blkddu', $drop_param);
 		
@@ -183,24 +191,50 @@ function rajavillabali_scripts() {
 		}
 	}
 	
-	wp_enqueue_style( 'rajavillabali-style', get_stylesheet_uri() );
-	wp_enqueue_style( 'responsive-style', get_template_directory_uri().'/responsive.css' );
-	wp_enqueue_script( 'rajavillabali-js', get_template_directory_uri() . '/js/custom.js', array('jquery'), null, true );
+	wp_enqueue_style( 'tree-muliselect', get_template_directory_uri() . '/assets/jqueryTree/css/jquery.bootstrap.treeselect.css',array(),null,'screen');
 	
-	if(is_page( get_option('rvb_submit_listings_page') )){
+	wp_enqueue_style( 'rajavillabali-style', get_stylesheet_uri(), array(), '1.0' );
+	wp_enqueue_style( 'responsive-style', get_template_directory_uri().'/responsive.css', array(), '1.0' );
+	wp_enqueue_script( 'bootstrap', get_template_directory_uri() . '/assets/bootstrap.min.js', array('jquery'), '1.0', true);
+	
+	wp_enqueue_script( 'jqueryTree', get_template_directory_uri() . '/assets/jqueryTree/js/jquery.bootstrap.treeselect.js', array('bootstrap'), '1.0', true);
+	
+	wp_enqueue_script( 'rajavillabali-js', get_template_directory_uri() . '/js/custom.js', array('jquery', 'blk-gmap-js', 'jqueryTree'), '1.2', true );
+	
+	
+	if(is_page( $property_submit_page )){
+		
+		$GLOBALS['submission_step'] = array(
+										'info'			=> 1,
+										'location'		=> 2,
+										'images'		=> 3,
+										'price'			=> 4,
+										'house_rule'	=> 5,
+										'review'		=> 6,
+										'submited'		=> 7,
+									);
 		$rvb_params = array(
-						'fee'	=> get_option('rvb_company_fee'),
+						'fee'				=> get_option('rvb_company_fee'),
 						'submitFormChanged'	=> false,
+						'submissionStep'	=> $GLOBALS['submission_step'],
+						'propertySubmitUrl'	=> get_page_link( $property_submit_page ),
 					);
 		
 		wp_localize_script('rajavillabali-js','rvbparams', $rvb_params);
 		
 		$review_params = array(
-							'propertyDetail'	=> __('#bedrooms bedroom(s) for up to #guest guests, land size #land_size sqm', 'rajavillabali'),
+							'propertyDetail'	=> __('#bedrooms bedroom(s) for up to #guest guests, #bathrooms bathrooms, land size #land_size sqm, home area #homearea sqm', 'rajavillabali'),
 							'photos'			=> __('#photos photos uploaded', 'rajavillabali'),
-							'contact_phone'		=> __('Customer Support Phone', 'rajavillabali'),
+							'contact_phone'		=> __('Phone', 'rajavillabali'),
 							'booking_email'		=> __('New Booking Email Receiver', 'rajavillabali'),
-							'contact_email'		=> __('Customer Support Email', 'rajavillabali'),
+							'contact_email'		=> __('Email', 'rajavillabali'),
+							'contact_name'		=> __('Name', 'rajavillabali'),
+							'contact_legal'		=> __('Legal Documents', 'rajavillabali'),
+							'show_more'			=> __('Show #n more', 'rajavillabali'),
+							'show_less'			=> __('Show less', 'rajavillabali'),
+							'pool_text'			=> __('#s Pool, Pool Size #n', 'rajavillabali'),
+							'breakfast_text'	=> __('Breakfast', 'rajavillabali'),
+							'breakfast_extra_text'	=> __('You will provide breakfast with #n extra cost per pax', 'rajavillabali'),
 						);
 		
 		wp_localize_script('rajavillabali-js','reviewText', $review_params);

@@ -2,9 +2,14 @@
 	$.fn.addLoadingLayer = function(options){
 		var settings = $.extend({
             size: "fa-3x",
+			spinner: true,
         }, options );
 		
-		var spinner = typeof adminpage != 'undefined' ? '<span class="load spinner is-active"></span>' : '<i class="load fa fa-spinner fa-pulse '+settings.size+'"></i>';
+		var spinner = '';
+		
+		if(settings.spinner){
+			spinner = typeof adminpage != 'undefined' ? '<span class="load spinner is-active"></span>' : '<i class="load fa fa-spinner fa-pulse '+settings.size+'"></i>';
+		}
 		
 		var layer = "<div class='loading-data'>"+spinner+"</div>";
 		this.append(layer);
@@ -13,7 +18,8 @@
 	};
 	
 	$.fn.removeLoadingLayer = function(){
-		this.find('.loading-data').remove();
+		this.children('.loading-data').remove();
+		this.css('position','');
 		return this;
 	};
 	
@@ -108,6 +114,15 @@ jQuery(document).ready(function($){
 	
 	$("#masthead").sticky({ topSpacing: 0 });
 	
+	if($('input.timepicker').length){
+		$('input.timepicker').timepicker({});
+	}
+	
+	$(".mphb_sc_search-location>select").treeselect({
+		buttontext : 'Any',
+		selectedTotal : 2,
+	});
+	
 	if(!is_mobile){
 		$(".bookbox").sticky({ topSpacing: 105 });
 	}
@@ -153,6 +168,7 @@ jQuery(document).ready(function($){
 	if($('#login-register-homeowner').length){
 		$('form#login-register-form-homeowner').submit(function(e){
 			e.preventDefault();
+			
 			var loaderWrapper = $('#login-register-homeowner .inner-window');
 			loaderWrapper.addLoadingLayer();
 			
@@ -194,6 +210,27 @@ jQuery(document).ready(function($){
 			});
 		});
 	}
+	
+	/* function blkPasswordMeter( passInput ){
+		var valid = true;
+		var upperCase= new RegExp('[A-Z]');
+		var numbers = new RegExp('[0-9]');
+		
+		var pass = passInput.val();
+		
+		if(pass.length < 8 || !pass.match(upperCase) || !pass.match(numbers)){
+			valid = false;
+		}
+		
+		if(!valid){
+			passInput.addMsg({
+				position	: 'right',
+				msg			: 'Your password must be at least 8 characters. <br> It must contain a mixture of upper and lower case letters, and at least one number or symbol.',
+			});
+		}
+		
+		return valid;
+	} */
 	
 	// Login for user and homeowner, register for user
 	if($('#login-register').length){
@@ -241,7 +278,8 @@ jQuery(document).ready(function($){
 					if(r[0] == 'success'){
 						//alert('berhasil');
 						loaderWrapper.find('.loading-data').prepend(r[1]);
-						location.reload();
+						//location.reload();
+						window.location.replace(r[2]);
 					}else{
 						loaderWrapper.find('.errors').html(r[1]);
 						loaderWrapper.removeLoadingLayer();
@@ -276,6 +314,7 @@ jQuery(document).ready(function($){
 	if($('.popup-window').length){
 		$('.popup-window #close-window').click(function(){
 			$('.popup-window').css('display', 'none');
+			$('body').css('overflow-y', 'auto');
 		});
 	}
 	
@@ -283,6 +322,12 @@ jQuery(document).ready(function($){
 	if($('.rvb-datepicker').length){
 		$('.rvb-datepicker').datepicker({
 			dateFormat: "d MM yy",
+		});
+	}
+	
+	if($('.rvb-clasic-datepicker').length){
+		$('.rvb-clasic-datepicker').datepicker({
+			dateFormat: "yy-mm-dd",
 		});
 	}
 	
@@ -418,6 +463,8 @@ jQuery(document).ready(function($){
 			$('body').css('overflow-y', 'hidden'); */
 			if($('#login-register-homeowner').length){
 				$('#login-register-homeowner').css('display', 'flex');
+				//$('#login-register-homeowner').css('overflow-y', 'auto');
+				$('body').css('overflow-y', 'hidden');
 			}else{
 				alert('Go to your account area');
 			}
@@ -518,6 +565,10 @@ jQuery(document).ready(function($){
 	}
 	
 	if($('.expand-att').length){
+		bindAttToogleLink();
+	}
+	
+	function bindAttToogleLink(){
 		$('.expand-att').click(function(e){
 			e.preventDefault();
 			
@@ -537,10 +588,20 @@ jQuery(document).ready(function($){
 	
 	if($('#submit-listing').length){
 		
+		var pid = getUrlParameter('pid');
+		var curStep = getUrlParameter('step');
+		
+		if(pid && curStep){
+			$("#step-1").addClass('hide').removeClass('show');
+			$("#step-" + curStep).addClass('show').removeClass('hide');
+			
+			if(curStep == rvbparams.submissionStep['review']){
+				reviewProperty();
+			}
+		}
+		
 		$('.buttons .next').click(function(){
 			
-			/* var theForm = $('#submit-property');
-			var valid = theForm[0].reportValidity(); */
 			var valid = submitPropertyValidation($(this).data('current'));
 			console.log(valid);
 			
@@ -559,9 +620,49 @@ jQuery(document).ready(function($){
 			$("#step-" + $(this).data('current')).addClass('hide').removeClass('show');
 			$("#step-" + $(this).data('step')).addClass('show').removeClass('hide');
 			
+			var postID = $('#submit-property').data('postid');
+		
+			if( postID ){
+				var url = rvbparams.propertySubmitUrl;
+				url += '?pid='+postID+'&step='+$(this).data('step');
+				window.history.replaceState("Filter", "Filter", url );
+			}
+		
 			window.scrollTo(0, 0);
 		});
 		
+		$('.buttons-editing .save-edit').click(function(){
+			
+			var valid = submitPropertyValidation($(this).data('current'));
+			console.log(valid);
+			
+			if(!valid) return;
+		
+			if(rvbparams.submitFormChanged){
+				$('#submit-listing .inner-form.editing').addLoadingLayer();
+				saveProperty( closeEditForm, $(this) );
+			}else{
+				closeEditForm( $(this) );
+			}
+			
+		});
+		
+		$('.buttons-editing .cancel-edit').click(function(){
+			closeEditForm( $(this) );
+		});
+		
+		function closeEditForm(obj){
+			//remove loading layer after property changes is saved
+			if(obj.hasClass('save-edit')){
+				$('#submit-listing .inner-form.editing').removeLoadingLayer();
+				reviewProperty();
+			}
+			
+			$('#step-'+obj.data('current')).removeClass('editing');
+			$('body').css('overflow', 'auto');
+			
+			
+		}
 		
 		$('.property-price-input').change(function(e){
 
@@ -599,10 +700,13 @@ jQuery(document).ready(function($){
 		$('a.edit-info').click(function(e){
 			e.preventDefault();
 			
-			$("#step-8").addClass('hide').removeClass('show');
+			/* $("#step-8").addClass('hide').removeClass('show');
 			$("#step-" + $(this).data('step')).addClass('show').removeClass('hide');
 			
-			window.scrollTo(0, 0);
+			window.scrollTo(0, 0); */
+			
+			$("#step-" + $(this).data('step')).addClass('editing');
+			$('body').css('overflow', 'hidden');
 		});
 		
 		//Submit property for review
@@ -617,7 +721,9 @@ jQuery(document).ready(function($){
 				return;
 			}
 			
-			$('#step-8').addLoadingLayer();
+			var review_step = rvbparams.submissionStep['review'],
+				next_step = review_step + 1;
+			$('#step-'+review_step).addLoadingLayer();
 			
 			var ajaxData = {
 				'action'	: 'submit_property_for_review',
@@ -633,16 +739,16 @@ jQuery(document).ready(function($){
 					var result = e.split('|');
 					
 					if(result[0] == 'success'){
-						$("#step-9").find('span.step-title').html(result[1]);
-						$("#step-9").find('#content-msg').html(result[2]);
+						$("#step-"+next_step).find('span.step-title').html(result[1]);
+						$("#step-"+next_step).find('#content-msg').html(result[2]);
 						
-						$("#step-8").addClass('hide').removeClass('show');
-						$("#step-9").addClass('show').removeClass('hide');
+						$("#step-"+review_step).addClass('hide').removeClass('show');
+						$("#step-"+next_step).addClass('show').removeClass('hide');
 					}else{
 						alert(result[1]);
 					}
 					
-					$('#step-8').removeLoadingLayer();
+					$('#step-'+review_step).removeLoadingLayer();
 				},
 				error	:	function (e, ee){
 					console.log(ee);
@@ -687,6 +793,80 @@ jQuery(document).ready(function($){
 				});
 			});
 		}
+		
+		$('input#bedrooms').change(function(){
+			var bedrooms = $(this).val(),
+				room_form_exist = $('.sleeping-arrangement .the-room').length;
+				console.log(room_form_exist);
+			if(room_form_exist){
+				var diff = parseInt(bedrooms) - parseInt(room_form_exist);
+				
+				//Jika ada pengurangan jumlah bedroom, hapus form sleeping arangement berdasarkan diff
+				if(diff < 0){
+					$('.the-room').slice(diff).remove();
+					return;
+				}
+			}
+			
+			var ajaxData = {
+				'action'	: 'render_sleeping_arrangement_form',
+				'bedrooms'	: bedrooms,
+				'start_from': room_form_exist,
+				
+			};
+			
+			$('.sleeping-arrangement').addLoadingLayer();
+			$.ajax({
+				url		: ajaxurl,
+				type	: 'POST',
+				data	: ajaxData,
+				success	: function(e){
+					if(room_form_exist){
+						$('.sleeping-arrangement').append(e);
+					}else{
+						$('.sleeping-arrangement').html(e);
+					}
+					
+					$('.sleeping-arrangement').removeLoadingLayer();
+				},
+				error	: function(e, ee){
+					console.log(ee);
+				}
+			});
+		});
+		
+		//Adding ical
+		$('#add-ical').click(function(){
+			var iCalWrapper = $('#icals');
+			var index = iCalWrapper.find('li:last-child').data('index');
+			console.log(index);
+				index = typeof index == 'undefined' ? 0 : (index + 1);
+			
+			var ical = '<li data-index="'+index+'">' + $('#ical-url').val() +
+							'<input type="hidden" name="mphb_sync_urls['+index+'][url]" value="'+$('#ical-url').val()+'">'+
+							'<span class="delete">&times;</span>'+
+						'</li>';
+			
+			iCalWrapper.append(ical);
+			//$('#ical-name').val('');
+			$('#ical-url').val('');
+			bindRemoveIcal();
+		});
+		
+		$('.breakfast').click(function(){
+			if($(this).val() == 'no'){
+				$('.bf-cost').removeClass('tmp-hide');
+			}else{
+				$('.bf-cost').addClass('tmp-hide');
+			}
+		});
+		
+	} //Submit Listing End
+	
+	function bindRemoveIcal(){
+		$('#icals li .delete').unbind().click(function(){
+			$(this).parent().remove();
+		});
 	}
 	
 	function nextStep(obj){
@@ -696,7 +876,17 @@ jQuery(document).ready(function($){
 		$("#step-" + obj.data('current')).addClass('hide').removeClass('show');
 		$("#step-" + obj.data('step')).addClass('show').removeClass('hide');
 		
-		if(obj.data('step') == 8){
+		var postID = $('#submit-property').data('postid');
+		
+		if( postID ){
+			var url = rvbparams.propertySubmitUrl;
+			url += '?pid='+postID+'&step='+obj.data('step');
+			window.history.replaceState("Filter", "Filter", url );
+		}
+		
+		console.log(rvbparams.submissionStep['review']);
+		
+		if(obj.data('step') == rvbparams.submissionStep['review']){
 			reviewProperty();
 		}
 		
@@ -706,7 +896,6 @@ jQuery(document).ready(function($){
 	function saveProperty( callbackFunc = null, nextButtonObj = null ){
 		
 		console.log('save property');
-		
 		var theForm = $('#submit-property');
 		
 		var formData = new FormData( theForm[0] );
@@ -767,9 +956,87 @@ jQuery(document).ready(function($){
 	
 	function submitPropertyValidation( step ){
 		var valid = true;
-		console.log(step);
+		//console.log(step);
 		
-		switch( step ){
+		$('input.rvb-required:visible, select.rvb-required:visible').each(function(){
+			if($(this).val() == '' || $(this).val() == 0){
+				$(this).addMsg({position: 'right'});
+				valid = false;
+				
+			}
+		});
+		
+		if($('#legal-docs').is(':visible')){
+			if($('.legal-docs-input').length == 0){
+				$('#file-uploader').addMsg({
+					position	: 'right', 
+					msg			: 'Please upload the required legal documents of your property',
+					callbackFunc	: function(msgBox){
+										blkddu.fileObj.on('drop', function(){
+											msgBox.remove();
+										});	
+									}
+				});
+				
+				valid = false;
+			}
+		}
+		
+		if($('#blk-map-wrapper').is(':visible')){
+			if( $('#pinpoint').val() == ''){
+				$('#blk-map-wrapper').addMsg({
+					position	: 'right', 
+					msg			: 'Please select your location on the map',
+					theInput	: '#pac-input',
+					
+				});
+				valid = false;
+			}
+		}
+		
+		if($('#media-uploader').is(':visible')){
+			if($('.images-input').length == 0){
+				$('#media-uploader').addMsg({
+					position	: 'right', 
+					msg			: 'Please upload some photos of your property',
+					callbackFunc	: function(msgBox){
+										blkddu.obj.on('drop', function(){
+											msgBox.remove();
+										});	
+									}
+				});
+				
+				valid = false;
+			}
+		}
+		
+		if($('#breakfast').is(':visible')){
+			if( $('#breakfast input[type="radio"]:checked').length == 0){
+				$('#breakfast').addMsg({
+					position	: 'right', 
+					msg			: 'Please state if it is include breakfast or not',
+					theInput	: '#breakfast input[type="radio"]',
+					
+				});
+				
+				valid = false;
+			}
+		}
+		
+		if($('.cancel-policies').is(':visible')){
+			var cencelPolicies = $('.cancel-policies');
+			if( cencelPolicies.find('input[type="radio"]:checked').length == 0 ){
+				cencelPolicies.addMsg({
+					position	: 'right',
+					msg			: 'Please select one of the cancelation policies',
+					theInput	: '.cancel-policies input[type="radio"]',
+				});
+				
+				valid = false;
+			}
+		}
+		
+		/* switch( step ){
 			case 1 :
 				var pname = $('#name'),
 					bedrooms = $('#bedrooms'),
@@ -799,6 +1066,19 @@ jQuery(document).ready(function($){
 			break;
 			
 			case 2	:
+				var valid = true;
+				$('.rvb-required').each(function(){
+					if($(this).val() == ''){
+						$(this).addMsg({position: 'right'});
+						valid = false;
+						return false;
+					}
+				});
+				
+				return valid;
+			break;
+			
+			case 3	:
 				var area = $('#area'),
 					pinpoint = $('#pinpoint');
 				
@@ -818,7 +1098,7 @@ jQuery(document).ready(function($){
 				}
 			break;
 			
-			case 3 :
+			case 5 :
 				if($('.images-input').length == 0){
 					$('#media-uploader').addMsg({
 						position	: 'right', 
@@ -834,7 +1114,7 @@ jQuery(document).ready(function($){
 				}
 			break;
 			
-			case 5 :
+			case 6 :
 				var price_high = $('#price-high-season-input');
 				if( price_high.val() == ''){
 					price_high.addMsg({position: 'right'});
@@ -849,7 +1129,7 @@ jQuery(document).ready(function($){
 				
 			break;
 			
-			case 6 :
+			case 7 :
 				var cencelPolicies = $('.cancel-policies');
 				if( cencelPolicies.find('input[type="radio"]:checked').length == 0 ){
 					cencelPolicies.addMsg({
@@ -862,7 +1142,7 @@ jQuery(document).ready(function($){
 				
 			break;
 			
-			case 7 :
+			case 8 :
 				var rvb_property_contact_phone = $('#rvb_property_contact_phone'),
 					rvb_property_contact_email = $('#rvb_property_contact_email'),
 					rvb_property_contact_new_booking_email = $('#rvb_property_contact_new_booking_email');
@@ -889,42 +1169,166 @@ jQuery(document).ready(function($){
 				}
 				
 			break;
-		}
+		} */
 		
 		return valid;
 	}
 	
 	function reviewProperty(){
-		$('#area-review').html($('select#area option:selected').text());
 		
-		var mapReview = $('#blk-map-wrapper');
-		mapReview.find('#pac-input').remove();
-		$('#map-review').html(mapReview.html());
+		/*
+		 *	Property Information
+		*/
 		
 		$('#property-name-review').html($('#name').val());
 		
 		var details = reviewText.propertyDetail;
 		details = details.replace('#bedrooms', $('#bedrooms').val());
+		details = details.replace('#bathrooms', $('#bathrooms').val());
 		details = details.replace('#guest', $('#capacity').val());
 		details = details.replace('#land_size', $('#land-size').val());
+		details = details.replace('#homearea', $('#home-area').val());
 		$('#property-detail-review').html(details);
 		
-		var photos = reviewText.photos;
-		photos = photos.replace('#photos', $('.images-input').length );
-		$('#photos-review').html(photos);
-		
-		var ammenities_text = '';
-		$('ul.ammenities').each(function(){
-			var ammenities = [];
-			$(this).find('input[type="checkbox"]:checked').each(function(){
-				ammenities.push($(this).next().text());
-			});
-			
-			ammenities_text += '<p><b>' + $(this).data('name') + ' : </b>' + ammenities.join(', ') + '</p>';
+		var sa = '';
+		$('.sleeping-arrangement .the-room').each(function(){
+			let ensuite = $(this).find('input[type="checkbox"]').is(':checked') ? '<i class="fa fa-check-circle-o" aria-hidden="true"></i>' : '<i class="fa fa-times-circle-o" aria-hidden="true"></i>';
+			sa += '<div class="col-sm-4">' +
+					'<div class="the-sla">' +
+						'<span class="att-title">'+$(this).find('label').text()+'</span>' +
+						'<ul class="mphb_room_type_facility">' +
+							'<li><i class="fa fa-bed" aria-hidden="true"></i> '+$(this).find('select option:selected').text()+'</li>' +
+							'<li>' + $(this).find('li:last-child b').text() +
+							' ' + ensuite +
+							'</li>' +
+						'</ul>' +
+					'</div>' +
+				'</div>';
 		});
 		
-		$('#ammenties-review').html(ammenities_text);
-
+		$('#property-sa-review').html('<div class="row">' + sa + '</div>');
+		
+		var ammenities_text = '';
+		$('.ammenities-inputs').each(function(){
+			
+			let remain = $(this).find('input[type="checkbox"]:checked').length - 10;
+			console.log(remain);
+			ammenities_text += '<div class="col-sm-4">'+
+									'<span class="att-title">'+$(this).children('label').text()+'</span>'+
+									'<ul class="mphb_room_type_facility">';
+									
+									$(this).find('input[type="checkbox"]:checked').each(function(){
+										ammenities_text += '<li><i class="fa fa-check-circle-o" aria-hidden="true"></i> '+$(this).next('label').text()+'</li>';
+									});
+									
+									
+						ammenities_text += '</ul>';
+							if(remain > 0){
+								let showMore = reviewText.show_more.replace('#n', remain);
+								ammenities_text += '<a href="#" class="expand-att">'+showMore+'</a>' +
+													'<a href="#" class="collaps-att tmp-hide">'+reviewText.show_less+'</a>';
+							}
+						ammenities_text +='</div>';
+		});
+		
+		$('#ammenties-review').html('<div class="row">' + ammenities_text + '</div>');
+		bindAttToogleLink();
+		
+		let poolText = reviewText.pool_text.replace('#s', $('#pool-type option:selected').text());
+			poolText = poolText.replace('#n', $('#pool-size').val())
+		
+		let miscAmm = '<ul class="mphb_room_type_facility">';
+		$('#misc-ammenities input[type="checkbox"]:checked').each(function(){
+			miscAmm += '<li><i class="fa fa-check-circle-o" aria-hidden="true"></i> '+$(this).prev('label').text() +'</li>';
+		});
+		
+		miscAmm += '</ul>';
+		$('#ammenties-misc-review').html('<p>'+poolText+'</p>' + miscAmm + '<br>');
+		
+		$('#description-review').html($('textarea#description').val());
+		
+		/* let legalDocs = $('#legal-docs');
+			legalDocs.find('.remove-uploaded-photo').remove();
+			legalDocs.find('input').remove();
+			legalDocs.find('label').remove(); */
+			
+		var propertyContact = '<b>Title : </b>' + $('#rvb_property_contact_title option:selected').text()
+								+ '<br><b>' + reviewText.contact_name + ' : </b>' + $('#rvb_property_contact_name').val()
+								+ '<br><b>' + reviewText.contact_phone + ' : </b>' + $('#rvb_property_contact_phone').val()
+								+ '<br><b>' + reviewText.contact_email + ' : </b>' + $('#rvb_property_contact_email').val()
+								+ '<br><b>' + reviewText.booking_email + ' : </b>' + $('#rvb_property_contact_new_booking_email').val()
+								+ '<br><br><b>' + reviewText.contact_legal + ' : </b><br><br>';
+		$('#contact-review').html(propertyContact);
+		
+		$('#contact-review').addLoadingLayer();
+		$.ajax({
+			url		: ajaxurl,
+			data	: {'action': 'get_villa_legal_docs_view', 'post_id': $('form#submit-property').data('postid')},
+			type	: 'POST',
+			success	: function(e){
+				$('#contact-review').append(e);
+				$('#contact-review').removeLoadingLayer();
+			},
+			error	: function(e, ee){
+				console.log(ee);
+			}
+		});
+		
+		/*
+		 *	Property Location
+		*/
+		
+		$('#address-review').html($('#property-address').val());
+		$('#area-review').html($('select#area option:selected').text());
+		
+		$('#map-review').blkgmap({
+			pinpoint : $('#blk-map-wrapper').find('#pinpoint').val(),
+		});
+		
+		$('#landmark-review').html($('#property-landmark').val());
+		
+		let pViews = [];
+		$('#property-views input[type="checkbox"]:checked').each(function(){
+			pViews.push($(this).next('label').text());
+		});
+		$('#views-review').html(pViews.join(', '));
+		
+		
+		/*
+		 *	Property Images
+		*/
+		
+		$('#photos-review').addLoadingLayer();
+		$.ajax({
+			url		: ajaxurl,
+			data	: {'action': 'get_villa_photos_view', 'post_id': $('form#submit-property').data('postid')},
+			type	: 'POST',
+			success	: function(e){
+				$('#photos-review').html(e);
+				$('#photos-review').removeLoadingLayer();
+			},
+			error	: function(e, ee){
+				console.log(ee);
+			}
+		});
+		
+		/*
+		 *	Property Price & Availability
+		*/
+		
+		let breakfast = reviewText.breakfast_text + ' ' + $('#breakfast input[type="radio"]:checked').next('label').text();
+		if($('#breakfast input[type="radio"]:checked').val() == 'no' && $('#bf-extra-cost').val() != '' ){
+			breakfast += '. ' + reviewText.breakfast_extra_text.replace('#n', ( 'USD ' + $('#bf-extra-cost').val() ) );
+		}
+		
+		$('#price-review').html($('#price-charge').html() + '<p>'+breakfast+'</p>');
+		$('#ical-review').html($('#ical-sync').html());
+		
+		
+		/*
+		 *	House Rules & Cancellation policy
+		*/
+		
 		var house_rule = [];
 		$('ul.house-rules input[type="checkbox"]:checked').each(function(){
 			house_rule.push($(this).next().text());
@@ -932,14 +1336,10 @@ jQuery(document).ready(function($){
 		
 		$('#house-rules-review').html( house_rule.join(', ') );
 		
+		let checkinout = '<b>Check-in</b> : '+$('#check-in').val() + '<br><b>Check-out</b> : ' + $('#check-out').val();
+		$('#check-inout-review').html(checkinout);
 		$('#cancel-policy-review').html( $('ul.cancel-policies input[type="radio"]:checked').next().text() );
-		
-		var propertyContact = reviewText.contact_phone + ' : ' + $('#rvb_property_contact_phone').val()
-								+ '<br>' + reviewText.contact_email + ' : ' + $('#rvb_property_contact_email').val()
-								+ '<br>' + reviewText.booking_email + ' : ' + $('#rvb_property_contact_new_booking_email').val();
-		
-		$('#contact-review').html(propertyContact);
-		
+
 	}
 	
 	if($('form#change-password').length){
@@ -1154,5 +1554,236 @@ jQuery(document).ready(function($){
 			
 		});
 	}
+	
+	if($('form#reset-password')){
+		$('form#reset-password').submit(function(e){
+			e.preventDefault();
+			
+			var theForm = $(this);
+			var formData = new FormData(theForm[0]);
+			
+			formData.append('action', 'rvb_get_reset_password_link');
+			
+			theForm.addLoadingLayer();
+			
+			$.ajax({
+				url		: ajaxurl,
+				data	: formData,
+				type	: 'POST',
+				processData: false,
+				contentType: false,
+				success	: function(e){
+					console.log(e);
+					
+					if(e.success){
+						alert(e.data.msg);
+					}else{
+						alert(e.data.msg);
+					}
+					
+					theForm.removeLoadingLayer();
+					
+				},
+				error	: function(e, ee){
+					console.log(ee);
+				}
+				
+			});
+			
+		});
+	}
+	
+	if($('form#do-reset-password')){
+		$('form#do-reset-password').submit(function(e){
+			e.preventDefault();
+			
+			var theForm = $(this);
+			var formData = new FormData(theForm[0]);
+			
+			if(formData.get('new-password') != formData.get('confirm-password')){
+				$('#confirm-password').addMsg({
+					msg	: 'New password and confirm password does not match',
+					position: 'right',
+				});
+			
+				return;
+			}
+			
+			formData.append('action', 'rvb_do_reset_password_link');
+			formData.append('uid', theForm.data('uid') );
+			
+			theForm.addLoadingLayer();
+			
+			$.ajax({
+				url		: ajaxurl,
+				data	: formData,
+				type	: 'POST',
+				processData: false,
+				contentType: false,
+				success	: function(e){
+					console.log(e);
+					
+					if(e.success){
+						alert(e.data.msg);
+						$('#login-register').css('display', 'flex');
+					}else{
+						alert(e.data.msg);
+					}
+					
+					theForm.removeLoadingLayer();
+					
+				},
+				error	: function(e, ee){
+					console.log(ee);
+				}
+				
+			});
+			
+		});
+	}
+	
+	if($('form#change-bank-info')){
+		
+		$('form#change-bank-info').submit(function(e){
+			e.preventDefault();
+			
+			var theForm = $(this);
+			var formData = new FormData(theForm[0]);
+			
+			formData.append('action', 'rvb_save_owner_bank_info');
+			formData.append('uid', theForm.data('uid') );
+			
+			if($('#otp-wrapper').is(':visible')){
+				var otp = $('input[name="verification"]').val();
+				if(otp == '' || otp.length != 6 ){
+					$('input[name="verification"]').addMsg({
+						position	: 'right',
+						msg			: 'Verification code should be in 6 numbers length',
+					});
+					
+					return false;
+				}
+			}
+			
+			theForm.addLoadingLayer();
+			
+			$.ajax({
+				url		: ajaxurl,
+				data	: formData,
+				type	: 'POST',
+				processData: false,
+				contentType: false,
+				success	: function(e){
+					
+					if(e.success){
+						if(e.data.saved){
+							alert(e.data.msg);
+							$('#otp-wrapper input').val('');
+							$('#otp-wrapper').hide();
+							$('#bank-fields').removeLoadingLayer();
+						}else{
+							$('#bank-fields').addLoadingLayer({
+								spinner: false,
+							});
+							$('#otp-wrapper').show();
+						}
+					}else{
+						alert(e.data.msg);
+					}
+					
+					theForm.removeLoadingLayer();
+					
+				},
+				error	: function(e, ee){
+					console.log(ee);
+				}
+				
+			});
+			
+		});
+		
+		$('#resend-bank-otp').click(function(ev){
+			ev.preventDefault();
+			
+			var theForm = $('form#change-bank-info');
+			theForm.addLoadingLayer();
+			
+			$.ajax({
+				url		: ajaxurl,
+				data	: {'action': 'resend_bank_change_otp'},
+				type	: 'POST',
+				success	: function(e){
+					
+					if(e.success){
+						alert(e.data.msg);
+					}else{
+						alert(e.data.msg);
+					}
+					
+					theForm.removeLoadingLayer();
+					
+				},
+				error	: function(e, ee){
+					console.log(ee);
+				}
+				
+			});
+		});
+	}
+	
+	if($('form#pp').length){
+		$('form#pp img').click(function(){
+			$('input[name="pp-input"]').click();
+		});
+		
+		$('input[name="pp-input"]').change(function(){
+			var theForm = $('form#pp');
+			var formData = new FormData( theForm[0] );
+			
+			formData.append('action', 'rvb_upload_photo_profile');
+			theForm.addLoadingLayer()
+			
+			//console.log(formData);
+			
+			$.ajax({
+				url		: ajaxurl,
+				data	: formData,
+				type	: 'POST',
+				processData: false,
+				contentType: false,
+				cache: false,
+				success	: function(e){
+					console.log(e);
+					if(e.success){
+						//theForm.find('input[name="uploaded_id_card"]').val(e.data.img_id);
+						$('img.user-pp').attr('src', e.data.img_url);
+					}else{
+						alert(e.data.msg);
+					}
+					
+					theForm.removeLoadingLayer();
+				},
+				error	: function(e, ee){
+					console.log(ee);
+				}
+				
+			});
+		});
+	}
+	
+	function getUrlParameter(sParam) {
+		var sPageURL = window.location.search.substring(1),
+			sURLVariables = sPageURL.split('&'),
+			sParameterName,
+			i;
+
+		for (i = 0; i < sURLVariables.length; i++) {
+			sParameterName = sURLVariables[i].split('=');
+
+			if (sParameterName[0] === sParam) {
+				return sParameterName[1] === undefined ? true : decodeURIComponent(sParameterName[1]);
+			}
+		}
+	};
 	
 });

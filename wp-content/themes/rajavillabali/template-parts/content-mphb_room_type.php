@@ -14,11 +14,12 @@
 <?php
 	$post_id = get_the_ID();
 	$gallery_imgs = get_post_meta($post_id, 'rvb_property_photos', true);
+	$thumb_url = wp_get_attachment_image_url($gallery_imgs[0], 'blog-big-thumb');
 ?>
-	<div class="photo-big">
+	<div class="photo-big" style="background-image: url(<?php echo $thumb_url ?>);">
 		<?php
-				echo wp_get_attachment_image($gallery_imgs[0], 'blog-big-thumb');
-			?>
+			//echo wp_get_attachment_image($gallery_imgs[0], 'blog-big-thumb');
+		?>
 		<div class="floating-info">
 			<div class="container">
 				<div class="not-under-title floating">
@@ -128,6 +129,35 @@
 								
 								?>
 								
+							</div>
+						</div>
+						
+						<div class="sleeping-arrangement ammenities white-box">
+							<h2 class="rvb-ammenities"><?php _e('Sleeping Arrangement', 'rajavillabali'); ?></h2>
+							<div class="row">
+							<?php
+								$sleeping_arr = get_post_meta($post->ID, 'sleeping_arr', true);
+								if(is_array($sleeping_arr)){
+									$i = 1;
+									foreach($sleeping_arr as $sla){
+										?>
+										<div class="col-sm-4">
+											<div class="the-sla">
+												<span class="att-title"><?php printf(__('Room %d', 'rajavillabali'), ($i)); ?></span>
+												<ul class="mphb_room_type_facility">
+													<li><i class="fa fa-bed" aria-hidden="true"></i> <?php echo $sla['bed_type']; ?></li>
+													<li><?php echo $sla['ensuite_bathroom'] == 'yes' ? '<i class="fa fa-check-circle-o" aria-hidden="true"></i>' : '<i class="fa fa-times-circle-o" aria-hidden="true"></i>'; ?> 
+														<?php _e('en suite bathroom', 'rajavillabali'); ?>
+													</li>
+												</ul>
+											</div>
+										</div>
+										<?php
+										$i++;
+									}
+									
+								}
+							?>
 							</div>
 						</div>
 						

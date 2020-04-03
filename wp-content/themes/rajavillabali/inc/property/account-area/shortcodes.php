@@ -127,17 +127,17 @@ function cancel_booking(){
 								?>
 							</li>
 							
-							<li>
-								<label><?php _e('Reason to cancel', 'rajavillabali') ?></label>
+							<!--<li>
+								<label><?php //_e('Reason to cancel', 'rajavillabali') ?></label>
 								<textarea name="reason" rows="10" required ></textarea>
 							</li>
 							<li>
-								<label><?php _e('File', 'rajavillabali') ?></label>
+								<label><?php //_e('File', 'rajavillabali') ?></label>
 								<div id="media-uploader" class="dropzone"></div>
 								<input type="hidden" id="media-ids" value="">
 								<div id="images"></div>
-								<small><?php _e('any files need to be sent regarding the cancelation if any, only image are accepted', 'rajavillabali'); ?></small>
-							</li>
+								<small><?php //_e('any files need to be sent regarding the cancelation if any, only image are accepted', 'rajavillabali'); ?></small>
+							</li>-->
 						</ul>
 						
 					</div>
@@ -202,7 +202,7 @@ function get_booking_list($user){
 	
 	
 	
-	if(!empty($bookings) && !empty($bookings_past)){
+	if(!empty($bookings) || !empty($bookings_past)){
 		
 		if(!empty($bookings)){
 			$my_booking_link = get_page_link(get_option('rvb_my_booking_page'));
@@ -368,8 +368,9 @@ function rvb_my_listing_page(){
 							<div class="row">
 								<div class="col-sm-4">
 									<?php
-									$gallery_imgs = get_post_meta($p->ID, 'rvb_property_photos', true);
-									$src = wp_get_attachment_image_src($gallery_imgs[0], 'blog-small-thumb');
+									//$gallery_imgs = get_post_meta($p->ID, 'rvb_property_photos', true);
+									$thumbnail_id = get_post_thumbnail_id($p->ID);
+									$src = wp_get_attachment_image_src($thumbnail_id, 'blog-small-thumb');
 									
 										if(!empty($src[0])){
 											$img_url = $src[0];
@@ -454,12 +455,13 @@ function rvb_submit_listing(){
 		<form id="submit-property" data-poststatus="<?php echo !empty($property) ? $property->post_status : ''; ?>" data-postid="<?php echo !empty($property) ? $property->ID : ''; ?>" >
 		<?php
 			include_once('submit-property-form/property-details.php');
+			//include_once('submit-property-form/property-sleeping-arrangement.php');
 			include_once('submit-property-form/property-address.php');
 			include_once('submit-property-form/property-images.php');
-			include_once('submit-property-form/property-ammenities.php');
+			//include_once('submit-property-form/property-ammenities.php');
 			include_once('submit-property-form/property-price.php');
 			include_once('submit-property-form/property-house-rule.php');
-			include_once('submit-property-form/property-contact.php');
+			//include_once('submit-property-form/property-contact.php');
 			include_once('submit-property-form/property-review.php');
 			include_once('submit-property-form/property-submited.php');
 		?>
@@ -486,6 +488,10 @@ function rvb_my_account(){
 			form_change_user_info($user);
 		}
 		
+		if($_GET['action'] == 'change-bank'){
+			owner_payment_setting($user);
+		}
+		
 	}else{
 		render_my_acount_page($user);
 	}
@@ -502,6 +508,15 @@ function render_my_acount_page($user){
 	<div id="my-account">
 		<div id="user-info" class="info-box">
 			<div class="info-head">
+				<?php $rvb_pp = get_user_meta($user->ID, 'rvb_pp', true); 
+					$pp = !empty($rvb_pp) ? wp_get_attachment_image_url($rvb_pp, 'medium') : 'http://1.gravatar.com/avatar/a78aa09b11d4c414b1a570b2f3f74f42?s=96&d=mm&r=g';
+				?>
+				<form id="pp">
+					<img src="<?php echo $pp; ?>" class="user-pp">
+					<i class="fa fa-pencil" aria-hidden="true"></i>
+					<input type="file" class="tmp-hide" name="pp-input">
+				</form>
+				
 				<span class="title">Your Information</span>
 			</div>
 			<div class="info-body">
@@ -597,6 +612,10 @@ function render_my_acount_page($user){
 			</div>
 			<?php
 		}
+		
+		if(rvb_is_user_logged_in('homeowner')){
+			owner_payment_information($user);
+		}
 		?>
 	</div>
 	<?php
@@ -668,4 +687,253 @@ function form_change_user_info($user){
 		</div>
 	</div>
 	<?php
+}
+
+add_shortcode('rvb_reset_password','rvb_reset_password');
+function rvb_reset_password(){
+
+	ob_start();
+	?>
+
+	<div class="reset-password-form">
+		<?php
+		if(empty($_GET['key']) && empty($_GET['login'])){
+			?>
+			<form id="reset-password">
+				<div class="info-box">
+					<div class="info-head">
+						<?php _e('Please enter your username or email address. You will receive a link to create a new password via email.', 'rajavillabali') ?>
+					</div>
+					<div class="info-body">
+						<ul>
+							<li>
+								<b><?php _e('Username or Email Address', 'rajavillabali'); ?></b><br><br>
+								<input style="width: 100%;" type="text" name="login-info" required >
+							</li>
+						</ul>
+					</div>
+					<div class="info-footer">
+						<input type="submit" value="<?php _e('Get new password', 'rajavillabali'); ?>">
+					</div>
+				</div>
+			</form>
+			<?php
+		}else{
+			$valid = false;
+			
+			if(!empty($_GET['key']) && !empty($_GET['login'])){
+				$user_id = username_exists($_GET['login']);
+				
+				if($user_id){
+					$key = get_user_meta($user_id, 'reset_password_key', true);
+					
+					if($key == $_GET['key']){
+						$valid = true;
+					}
+				}
+			}
+			
+			if($valid){
+			?>
+				<form id="do-reset-password" data-uid="<?php echo $user_id; ?>">
+					<div class="info-box">
+						<div class="info-head">
+							<?php _e('Enter your new password below.', 'rajavillabali') ?>
+						</div>
+						<div class="info-body">
+							<ul>
+								<li>
+									<b><?php _e('New password', 'rajavillabali'); ?></b><br>
+									<input style="width: 100%;" type="password" name="new-password" required ><br><br>
+								</li>
+								<li>
+									<b><?php _e('Confirm New password', 'rajavillabali'); ?></b><br>
+									<input style="width: 100%;" type="password" name="confirm-password" required id="cp" >
+								</li>
+							</ul>
+						</div>
+						<div class="info-footer">
+							<input type="submit" value="<?php _e('Reset password', 'rajavillabali'); ?>">
+						</div>
+					</div>
+				</form>
+			<?php
+			}else{
+				_e('Invalid request', 'rajavillabali');
+			}
+		}
+		?>
+		
+		
+	</div>
+	<?php
+	
+	return ob_get_clean();
+}
+
+function owner_payment_information($user){
+	$my_account_link = get_page_link(get_option('rvb_my_account_page'));
+	$bank_info = get_user_meta($user->ID, 'bankinfo', true);
+	?>
+	<div id="owner-payment-info">
+		<div class="info-box">
+			<div class="info-head">
+				<span class="title">Bank Account</span>
+			</div>
+			<div class="info-body">
+				<p><?php _e('This information will be used to wire you the payment', 'rajavillabali'); ?></p>
+				<ul>
+					<li>
+						<label><?php _e('Bank Name', 'rajavillabali'); ?></label> : 
+						<?php echo !empty($bank_info['name']) ? $bank_info['name'] : '' ?>
+					</li>
+					<li>
+						<label><?php _e('Bank Address', 'rajavillabali'); ?></label> : 
+						<?php echo !empty($bank_info['address']) ? $bank_info['address'] : '' ?>
+					</li>
+					<li>
+						<label><?php _e('Account Name', 'rajavillabali'); ?></label> : 
+						<?php echo !empty($bank_info['account_name']) ? $bank_info['account_name'] : '' ?>
+					</li>
+					<li>
+						<label><?php _e('Account Number', 'rajavillabali'); ?></label> : 
+						<?php echo !empty($bank_info['account_number']) ? $bank_info['account_number'] : '' ?>
+					</li>
+					<li>
+						<label><?php _e('Account Currency', 'rajavillabali'); ?></label> : 
+						<?php echo !empty($bank_info['account_currency']) ? $bank_info['account_currency'] : '' ?>
+					</li>
+					<li>
+						<label><?php _e('Swift Code', 'rajavillabali'); ?></label> : 
+						<?php echo !empty($bank_info['swift_code']) ? $bank_info['swift_code'] : '' ?>
+					</li>
+				<ul>
+			</div>
+			<div class="info-footer">
+				<a href="<?php echo $my_account_link ?>?action=change-bank" class="button">Change</a>
+			</div>
+		</div>
+	</div>
+	<?php
+}
+
+function owner_payment_setting($user){
+	$my_account_link = get_page_link(get_option('rvb_my_account_page'));
+	$bank_info = get_user_meta($user->ID, 'bankinfo', true);
+	?>
+	<div id="form-edit-bank-info">
+		<div class="info-box">
+			<form id="change-bank-info" data-uid="<?php echo $user->ID; ?>">
+				<div class="info-head">
+					<span class="title">Change Bank Information</span>
+				</div>
+				<div class="info-body" id="bank-fields">
+					<ul>
+						<li>
+							<label>Bank Name <sup>*</sup></label> : 
+							<input type="text" name="bankinfo[name]" required value="<?php echo !empty($bank_info['name']) ? $bank_info['name'] : '' ?>">
+						</li>
+						<li>
+							<label>Bank Address <sup>*</sup></label> : 
+							<input type="text" name="bankinfo[address]" required value="<?php echo !empty($bank_info['address']) ? $bank_info['address'] : '' ?>">
+						</li>
+						<li>
+							<label>Account Name <sup>*</sup></label> : 
+							<input type="text" name="bankinfo[account_name]" required value="<?php echo !empty($bank_info['account_name']) ? $bank_info['account_name'] : '' ?>">
+						</li>
+						<li>
+							<label>Account Number <sup>*</sup></label> : 
+							<input type="text" name="bankinfo[account_number]" required value="<?php echo !empty($bank_info['account_number']) ? $bank_info['account_number'] : '' ?>">
+						</li>
+						<li>
+							<label>Account Currency <sup>*</sup></label> : 
+							<input type="text" name="bankinfo[account_currency]" required value="<?php echo !empty($bank_info['account_currency']) ? $bank_info['account_currency'] : '' ?>">
+						</li>
+						<li>
+							<label>Swift Code</label> : 
+							<input type="text" name="bankinfo[swift_code]" value="<?php echo !empty($bank_info['swift_code']) ? $bank_info['swift_code'] : '' ?>">
+						</li>
+					<ul>
+				</div>
+				<div class="info-body tmp-hide" id="otp-wrapper">
+					<p>
+						<?php _e('A verification code has been sent to your email. The verification code will expired in 10 minutes, please fill in the code you received to the field below before it is expired to continue', 'rajavillabali'); ?>
+					</p>
+					<ul>
+						<li>
+							<label>Verification Code</label> : 
+							<input type="text" name="verification" value="">
+							<p class="description">
+								<?php _e('Did not received the code?', 'rajavillabali') ?> <a href="#" id="resend-bank-otp">Resend verification code</a>
+							</p>
+						</li>
+					</ul>
+				</div>
+				<div class="info-footer">
+					<a href="<?php echo $my_account_link ?>" class="button">Back</a>
+					<input type="submit" value="Save Changes">
+				</div>
+			</form>
+		</div>
+	</div>
+	<?php
+}
+
+add_shortcode('rvb_income_report', 'income_report');
+function income_report(){
+	$user = rvb_get_current_user();
+	if($user === false || !rvb_user_can($user, 'can_listing')) return _e('You are not authorized to access this page', 'rajavillabali');
+	
+	ob_start();
+	$actual_link = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+	?>
+	<div class="filters-export">
+		<div class="row">
+			<div class="col-sm-12">
+				<form id="report-filter" method="GET" action="<?php echo $actual_link; ?>">
+					<!--
+					<input name="accomodation" autocomplete="off" id="find-accomodation" type="text" value="<?php echo !empty($_GET['accomodation']) ? $_GET['accomodation'] : '' ?>" placeholder="All Accomodation">
+					<input name="accomodation_id" type="hidden" value="<?php echo !empty($_GET['accomodation_id']) ? $_GET['accomodation_id'] : '' ?>">
+					-->
+					<select name="accomodation_id">
+						<option value=""></option>
+						<?php
+							$properties = get_posts(array(
+													'post_type'			=> 'mphb_room_type',
+													'posts_per_page'	=> -1,
+													'author'		=> $user->ID,
+												));
+							if($properties){
+								foreach($properties as $p){
+									?>
+									<option <?php echo !empty($_GET['accomodation_id']) && $_GET['accomodation_id'] == $p->ID ? 'selected' : ''; ?> value="<?php echo $p->ID ?>"><?php echo apply_filters('the_title', $p->post_title) ?></option>
+									<?php
+								}
+							}
+						?>
+					</select>
+					
+					<input name="date-from" autocomplete="off" class="rvb-clasic-datepicker" type="text" value="<?php echo !empty($_GET['date-from']) ? $_GET['date-from'] : '' ?>" placeholder="Date From">
+					<input name="date-until" autocomplete="off" class="rvb-clasic-datepicker" type="text" value="<?php echo !empty($_GET['date-until']) ? $_GET['date-until'] : '' ?>" placeholder="Date Until">
+					
+					<input type="submit" name="filter-report" id="submit" class="button button-primary" value="Filter">
+					<?php
+					if($paged>1){
+						?>
+						<input type="hidden" name="paged" value="<?php echo $paged; ?>">
+						<?php
+					}
+					?>
+				</form>
+			</div>
+			
+		</div>
+	</div>
+	<?php
+	$revenue_data = get_revenue(array(
+							'owner_id'	=> $user->ID,
+						));
+	//$revenue_data = get_revenue();
+	render_revenue_table( $revenue_data, true );
+	return ob_get_clean();
 }

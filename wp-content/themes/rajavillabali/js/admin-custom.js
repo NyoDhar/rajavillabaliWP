@@ -501,4 +501,39 @@ jQuery(document).ready(function($){
 		Graphs js end
 	*/
 	
+	$('input#rvb_bedrooms').change(function(){
+		var bedrooms = $(this).val(),
+			room_form_exist = $('.the-room').length;
+			
+		if(room_form_exist){
+			var diff = parseInt(bedrooms) - parseInt(room_form_exist);
+			
+			//Jika ada pengurangan jumlah bedroom, hapus form sleeping arangement berdasarkan diff
+			if(diff < 0){
+				$('.the-room').slice(diff).remove();
+				return;
+			}
+		}
+		
+		var ajaxData = {
+			'action'	: 'render_sleeping_arrangement_form',
+			'bedrooms'	: bedrooms,
+			'start_from': room_form_exist,
+			'attr'		: 'required', //applied to the bed_type dropdown
+		};
+		
+		$.ajax({
+			url		: ajaxurl,
+			type	: 'POST',
+			data	: ajaxData,
+			success	: function(e){
+				$('#sleeping-arrangement .inside').append(e);
+				
+			},
+			error	: function(e, ee){
+				console.log(ee);
+			}
+		});
+	});
+	
 });

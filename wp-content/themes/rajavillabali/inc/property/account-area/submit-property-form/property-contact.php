@@ -1,5 +1,5 @@
 <?php
-	$current_step = 7;
+	$current_step = 8;
 	$next = $current_step + 1;
 	$prev = $current_step - 1;
 ?>

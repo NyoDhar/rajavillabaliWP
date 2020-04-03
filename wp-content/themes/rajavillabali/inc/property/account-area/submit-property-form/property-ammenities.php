@@ -10,15 +10,17 @@
 		<div class="col-sm-8">
 			<div class="the-form">
 				<?php
+					$att_input_settings = get_option('ammenities_input');
 					$attributes = get_posts(array(
 									'post_type'			=> 'mphb_room_attribute',
 									'posts_per_page'	=> -1,
-									'meta_query'		=> array(
+									'post__in'			=> $att_input_settings,
+									/* 'meta_query'		=> array(
 															array(
 																'key'	=> 'mphb_visible',
 																'value'	=> '1'
 															)
-														)
+														) */
 								));
 					
 					if(!empty($attributes)){
